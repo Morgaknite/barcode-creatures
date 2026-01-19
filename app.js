@@ -370,6 +370,9 @@ document.getElementById('start-camera').onclick = async () => {
             video: { facingMode: 'environment' } 
         });
         video.srcObject = stream;
+        
+        // Wait for video to be ready
+        await video.play();
 
         codeReader = new ZXing.BrowserMultiFormatReader();
         
@@ -384,10 +387,15 @@ document.getElementById('start-camera').onclick = async () => {
                     processBarcode(barcode.substring(0, 12));
                     scanning = false;
                     document.getElementById('start-camera').textContent = 'Start Camera';
+                    
+                    // Stop the camera
+                    stream.getTracks().forEach(track => track.stop());
+                    video.srcObject = null;
                 }
             }
         });
     } catch (err) {
+        console.error('Camera error:', err);
         let message = 'Camera access denied or not available. ';
         if (err.name === 'NotAllowedError') {
             message += 'Please allow camera access in your browser settings.';
@@ -396,9 +404,10 @@ document.getElementById('start-camera').onclick = async () => {
         } else if (err.name === 'NotSupportedError') {
             message += 'Camera requires HTTPS connection. Use "Enter Barcode Manually" instead.';
         } else {
-            message += 'Use "Enter Barcode Manually" to add creatures.';
+            message += 'Error: ' + err.message + '. Use "Enter Barcode Manually" to add creatures.';
         }
         showError(message);
+        document.getElementById('start-camera').textContent = 'Start Camera';
     }
 };
 
