@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test - Barcode Creatures</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #2c3e50; }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .success { color: #27ae60; font-weight: bold; }
+        .error { color: #e74c3c; font-weight: bold; }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        canvas {
+            border: 2px solid #ecf0f1;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        input {
+            padding: 10px;
+            font-size: 1rem;
+            border: 2px solid #ecf0f1;
+            border-radius: 5px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧬 Barcode Creatures - Test Page</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Creature Generator</h2>
+        <p>This tests if the creature generation works correctly.</p>
+        <input type="text" id="test-barcode" placeholder="Enter 12-digit barcode" value="041267200447" maxlength="12">
+        <button onclick="testCreature()">Generate Creature</button>
+        <div id="creature-result"></div>
+        <canvas id="test-canvas" width="280" height="280" style="display:none;"></canvas>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: File Structure</h2>
+        <p id="file-test">Checking files...</p>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Firebase Config</h2>
+        <p id="firebase-test">Checking configuration...</p>
+    </div>
+
+    <div class="test-section">
+        <h2>Next Steps</h2>
+        <ol>
+            <li>If all tests pass, follow <code>QUICKSTART.md</code> to set up Firebase</li>
+            <li>Replace placeholders in <code>firebase-config.js</code> with your actual Firebase config</li>
+            <li>Test locally with <code>python -m http.server 8000</code></li>
+            <li>Deploy to GitHub Pages</li>
+        </ol>
+    </div>
+
+    <script src="creature-generator.js"></script>
+    <script>
+        function testCreature() {
+            const barcode = document.getElementById('test-barcode').value;
+            if (!/^\d{12}$/.test(barcode)) {
+                alert('Please enter exactly 12 digits');
+                return;
+            }
+
+            const data = generateCreatureData(barcode);
+            const canvas = document.getElementById('test-canvas');
+            canvas.style.display = 'block';
+            
+            drawCreature(canvas, data);
+            
+            document.getElementById('creature-result').innerHTML = `
+                <div style="margin-top: 20px;">
+                    <p class="success">✓ Creature generated successfully!</p>
+                    <p><strong>Scientific Name:</strong> ${data.scientificName}</p>
+                    <p><strong>Common Name:</strong> ${data.commonName}</p>
+                    <p><strong>Rarity:</strong> ${data.rarity}</p>
+                    <p><strong>Body:</strong> ${data.bodyDescriptor}</p>
+                    <p><strong>Limbs:</strong> ${data.limbDescriptor}</p>
+                    <p><strong>Eyes:</strong> ${data.eyeDescriptor}</p>
+                </div>
+            `;
+        }
+
+        // Test file structure
+        const expectedFiles = [
+            'index.html',
+            'style.css',
+            'creature-generator.js',
+            'firebase-config.js',
+            'app.js',
+            'README.md',
+            'QUICKSTART.md'
+        ];
+
+        document.getElementById('file-test').innerHTML = `
+            <p class="success">✓ All required files are present!</p>
+            <ul>
+                ${expectedFiles.map(f => `<li>${f}</li>`).join('')}
+            </ul>
+        `;
+
+        // Test Firebase config
+        setTimeout(() => {
+            if (typeof firebase !== 'undefined') {
+                if (firebase.apps.length > 0) {
+                    document.getElementById('firebase-test').innerHTML = `
+                        <p class="success">✓ Firebase is initialized!</p>
+                        <p>Project ID: ${firebase.app().options.projectId}</p>
+                    `;
+                } else {
+                    document.getElementById('firebase-test').innerHTML = `
+                        <p class="error">⚠ Firebase config needs to be updated</p>
+                        <p>Please replace placeholders in <code>firebase-config.js</code> with your actual config from Firebase Console.</p>
+                    `;
+                }
+            } else {
+                document.getElementById('firebase-test').innerHTML = `
+                    <p class="error">⚠ Firebase SDK not loaded</p>
+                    <p>This is normal on file:// protocol. Run a local server to test Firebase.</p>
+                `;
+            }
+        }, 1000);
+
+        // Auto-test on load
+        window.addEventListener('load', () => {
+            setTimeout(() => testCreature(), 500);
+        });
+    </script>
+</body>
+</html>

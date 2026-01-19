@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barcode Creatures</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Login Page -->
+    <div class="page active" id="login-page">
+        <div class="login-container">
+            <div class="login-header">
+                <h1>🧬 Barcode Creatures</h1>
+                <p class="subtitle">Discover unique creatures from everyday barcodes</p>
+            </div>
+            <div class="login-content">
+                <p class="login-description">Sign in to save your collection to the cloud and sync across devices.</p>
+                <button class="btn btn-google" id="google-signin">
+                    <span class="google-icon">G</span>
+                    Sign in with Google
+                </button>
+                <div class="login-footer">
+                    <p>Your collection will be securely saved and accessible from any device.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scanner Page -->
+    <div class="page" id="scanner-page">
+        <div class="header">
+            <h1>🔬 Scan Creature</h1>
+            <p class="subtitle">Point camera at any barcode</p>
+        </div>
+
+        <div class="scanner-container">
+            <video id="video" autoplay playsinline></video>
+            
+            <div class="scanner-controls">
+                <button class="btn" id="start-camera">Start Camera</button>
+                <button class="btn btn-secondary" id="toggle-manual">Enter Barcode Manually</button>
+                
+                <div class="manual-input" id="manual-input">
+                    <div class="input-group">
+                        <input type="text" id="barcode-input" placeholder="Enter 12-digit barcode" maxlength="12" pattern="[0-9]*" inputmode="numeric">
+                        <button class="btn" id="submit-barcode">Scan</button>
+                    </div>
+                </div>
+
+                <div id="camera-error" style="display: none;" class="camera-error"></div>
+                <div id="success-message" style="display: none;" class="success-message"></div>
+                
+                <div class="camera-info">
+                    <strong>📱 Camera Tips:</strong><br>
+                    Camera works on HTTPS. Manual entry works everywhere - just type the barcode numbers!
+                </div>
+            </div>
+
+            <div class="stats-display">
+                <div class="stat-item-inline">Collection: <strong id="total-count">0</strong></div>
+                <div class="stat-item-inline">Last Scan: <strong id="last-scan">None</strong></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Collection Page -->
+    <div class="page" id="collection-page">
+        <div class="header">
+            <h1>📚 My Collection</h1>
+            <p class="subtitle">Discovered creatures</p>
+        </div>
+
+        <div class="collection-header">
+            <div class="collection-count">
+                <span id="collection-total">0</span> Specimens
+            </div>
+            <button class="btn btn-small" id="backup-btn">💾 Backup</button>
+        </div>
+
+        <div class="filter-group">
+            <select id="rarity-filter">
+                <option value="">All Rarities</option>
+                <option value="Common">Common</option>
+                <option value="Uncommon">Uncommon</option>
+                <option value="Rare">Rare</option>
+                <option value="Epic">Epic</option>
+                <option value="Legendary">Legendary</option>
+                <option value="Mythic">Mythic</option>
+            </select>
+            <select id="sort-filter">
+                <option value="recent">Recently Added</option>
+                <option value="name">Name (A-Z)</option>
+                <option value="rarity">Rarity</option>
+            </select>
+        </div>
+
+        <div class="grid" id="collection-grid"></div>
+
+        <div class="empty-state" id="empty-state" style="display: none;">
+            <div class="empty-state-icon">🔍</div>
+            <h2>No Creatures Yet</h2>
+            <p>Start scanning barcodes to build your collection!</p>
+        </div>
+    </div>
+
+    <!-- Settings Page -->
+    <div class="page" id="settings-page">
+        <div class="header">
+            <h1>⚙️ Settings</h1>
+            <p class="subtitle">Account & Data</p>
+        </div>
+
+        <div class="settings-container">
+            <div class="settings-section">
+                <h2>Account</h2>
+                <div class="settings-item">
+                    <div class="settings-label">
+                        <strong>Email</strong>
+                        <p id="user-email">Loading...</p>
+                    </div>
+                </div>
+                <button class="btn btn-secondary" id="signout-btn">Sign Out</button>
+            </div>
+
+            <div class="settings-section">
+                <h2>Data Management</h2>
+                <p class="settings-description">Your collection is automatically saved to the cloud. You can also create manual backups.</p>
+                <button class="btn" id="export-btn">📥 Export Collection</button>
+                <button class="btn btn-secondary" id="import-btn">📤 Import Collection</button>
+                <input type="file" id="import-file" accept=".json" style="display: none;">
+            </div>
+
+            <div class="settings-section">
+                <h2>About</h2>
+                <p class="settings-description">
+                    <strong>Version:</strong> 1.0.0<br>
+                    <strong>Storage:</strong> Cloud (Firebase)<br>
+                    <strong>Created by:</strong> You!
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div class="modal" id="detail-modal">
+        <div class="modal-content">
+            <button class="modal-close" id="close-modal">×</button>
+            <div id="detail-content"></div>
+        </div>
+    </div>
+
+    <!-- Discovery Modal -->
+    <div class="discovery-modal" id="discovery-modal">
+        <div class="discovery-content">
+            <div class="discovery-title">🎉 New Discovery!</div>
+            <div class="discovery-subtitle">Creature added to collection</div>
+            <div class="discovery-creature-display">
+                <canvas id="discovery-canvas" width="200" height="200"></canvas>
+                <div class="discovery-name">
+                    <div class="discovery-scientific" id="discovery-scientific"></div>
+                    <div class="discovery-common" id="discovery-common"></div>
+                    <div class="discovery-rarity-big" id="discovery-rarity"></div>
+                </div>
+            </div>
+            <div class="source-input-container">
+                <label class="source-input-label">What item did you scan?</label>
+                <input type="text" class="source-input" id="discovery-source-input" placeholder="e.g., PS5 box, Shampoo bottle">
+            </div>
+            <button class="discovery-close-btn" id="close-discovery">View Collection</button>
+        </div>
+    </div>
+
+    <!-- Source Edit Modal -->
+    <div class="source-edit-modal" id="source-edit-modal">
+        <div class="source-edit-content">
+            <div class="source-edit-title">Edit Source Item</div>
+            <input type="text" class="source-edit-input" id="source-edit-input" placeholder="What item was this?">
+            <div class="source-edit-buttons">
+                <button class="source-cancel-btn" id="cancel-source-edit">Cancel</button>
+                <button class="source-save-btn" id="save-source-edit">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="nav" id="main-nav" style="display: none;">
+        <button class="nav-btn active" data-page="scanner-page">
+            <div class="nav-icon">📷</div>
+            <div>Scanner</div>
+        </button>
+        <button class="nav-btn" data-page="collection-page">
+            <div class="nav-icon">📚</div>
+            <div>Collection</div>
+        </button>
+        <button class="nav-btn" data-page="settings-page">
+            <div class="nav-icon">⚙️</div>
+            <div>Settings</div>
+        </button>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <!-- Barcode Scanner Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest"></script>
+    
+    <!-- App Scripts -->
+    <script src="firebase-config.js"></script>
+    <script src="creature-generator.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

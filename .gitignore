@@ -1,0 +1,16 @@
+# Firebase config with your actual keys (don't commit the real one!)
+# firebase-config.js
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
