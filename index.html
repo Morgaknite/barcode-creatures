@@ -34,8 +34,14 @@
             <p class="subtitle">Point camera at any barcode</p>
         </div>
 
-        <div class="scanner-container">
+        <div class="scanner-container" id="scanner-container">
             <video id="video" autoplay playsinline></video>
+            <div class="scan-guide" id="scan-guide" style="display: none;">
+                <div class="scan-guide-corner top-left"></div>
+                <div class="scan-guide-corner top-right"></div>
+                <div class="scan-guide-corner bottom-left"></div>
+                <div class="scan-guide-corner bottom-right"></div>
+            </div>
             
             <div class="scanner-controls">
                 <button class="btn" id="start-camera">Start Camera</button>

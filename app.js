@@ -367,30 +367,71 @@ document.getElementById('start-camera').onclick = async () => {
         }
 
         const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'environment' } 
+            video: { 
+                facingMode: 'environment',
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            } 
         });
         video.srcObject = stream;
         
         // Wait for video to be ready
         await video.play();
 
-        codeReader = new ZXing.BrowserMultiFormatReader();
+        // Use optimized settings for faster mobile scanning
+        const hints = new Map();
+        const formats = [
+            ZXing.BarcodeFormat.EAN_13,
+            ZXing.BarcodeFormat.EAN_8,
+            ZXing.BarcodeFormat.UPC_A,
+            ZXing.BarcodeFormat.UPC_E
+        ];
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, false); // Faster but less accurate
+        
+        codeReader = new ZXing.BrowserMultiFormatReader(hints);
         
         scanning = true;
         document.getElementById('start-camera').textContent = 'Scanning...';
         document.getElementById('camera-error').style.display = 'none';
+        
+        // Show scan guide
+        const scanGuide = document.getElementById('scan-guide');
+        if (scanGuide) {
+            scanGuide.style.display = 'block';
+            document.getElementById('scanner-container').classList.add('scanning');
+        }
 
+        // Throttle scanning to every 300ms for better mobile performance
+        let lastScanTime = 0;
+        const scanInterval = 300; // milliseconds
+        
         codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
-            if (result && scanning) {
+            const now = Date.now();
+            
+            if (result && scanning && (now - lastScanTime > scanInterval)) {
+                lastScanTime = now;
                 const barcode = result.text;
                 if (/^\d{12,13}$/.test(barcode)) {
                     processBarcode(barcode.substring(0, 12));
                     scanning = false;
                     document.getElementById('start-camera').textContent = 'Start Camera';
                     
+                    // Hide scan guide
+                    const scanGuide = document.getElementById('scan-guide');
+                    if (scanGuide) {
+                        scanGuide.style.display = 'none';
+                        document.getElementById('scanner-container').classList.remove('scanning');
+                    }
+                    
                     // Stop the camera
                     stream.getTracks().forEach(track => track.stop());
                     video.srcObject = null;
+                    
+                    // Optional: vibrate on success (if supported)
+                    if (navigator.vibrate) {
+                        navigator.vibrate(200);
+                    }
                 }
             }
         });
@@ -408,6 +449,13 @@ document.getElementById('start-camera').onclick = async () => {
         }
         showError(message);
         document.getElementById('start-camera').textContent = 'Start Camera';
+        
+        // Hide scan guide on error
+        const scanGuide = document.getElementById('scan-guide');
+        if (scanGuide) {
+            scanGuide.style.display = 'none';
+            document.getElementById('scanner-container').classList.remove('scanning');
+        }
     }
 };
 
