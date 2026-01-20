@@ -369,8 +369,8 @@ document.getElementById('start-camera').onclick = async () => {
         const stream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
                 facingMode: 'environment',
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
             } 
         });
         video.srcObject = stream;
@@ -378,18 +378,7 @@ document.getElementById('start-camera').onclick = async () => {
         // Wait for video to be ready
         await video.play();
 
-        // Use optimized settings for faster mobile scanning
-        const hints = new Map();
-        const formats = [
-            ZXing.BarcodeFormat.EAN_13,
-            ZXing.BarcodeFormat.EAN_8,
-            ZXing.BarcodeFormat.UPC_A,
-            ZXing.BarcodeFormat.UPC_E
-        ];
-        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-        hints.set(ZXing.DecodeHintType.TRY_HARDER, false); // Faster but less accurate
-        
-        codeReader = new ZXing.BrowserMultiFormatReader(hints);
+        codeReader = new ZXing.BrowserMultiFormatReader();
         
         scanning = true;
         document.getElementById('start-camera').textContent = 'Scanning...';
@@ -402,39 +391,57 @@ document.getElementById('start-camera').onclick = async () => {
             document.getElementById('scanner-container').classList.add('scanning');
         }
 
-        // Throttle scanning to every 300ms for better mobile performance
-        let lastScanTime = 0;
-        const scanInterval = 300; // milliseconds
+        // Scan continuously but process results with throttle
+        let lastAttempt = 0;
+        const throttleMs = 100; // Try scanning every 100ms
         
-        codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
-            const now = Date.now();
+        const scanLoop = async () => {
+            if (!scanning) return;
             
-            if (result && scanning && (now - lastScanTime > scanInterval)) {
-                lastScanTime = now;
-                const barcode = result.text;
-                if (/^\d{12,13}$/.test(barcode)) {
-                    processBarcode(barcode.substring(0, 12));
-                    scanning = false;
-                    document.getElementById('start-camera').textContent = 'Start Camera';
-                    
-                    // Hide scan guide
-                    const scanGuide = document.getElementById('scan-guide');
-                    if (scanGuide) {
-                        scanGuide.style.display = 'none';
-                        document.getElementById('scanner-container').classList.remove('scanning');
-                    }
-                    
-                    // Stop the camera
-                    stream.getTracks().forEach(track => track.stop());
-                    video.srcObject = null;
-                    
-                    // Optional: vibrate on success (if supported)
-                    if (navigator.vibrate) {
-                        navigator.vibrate(200);
+            const now = Date.now();
+            if (now - lastAttempt < throttleMs) {
+                requestAnimationFrame(scanLoop);
+                return;
+            }
+            lastAttempt = now;
+            
+            try {
+                const result = await codeReader.decodeOnceFromVideoDevice(undefined, 'video');
+                if (result && scanning) {
+                    const barcode = result.text;
+                    console.log('Scanned:', barcode);
+                    if (/^\d{12,13}$/.test(barcode)) {
+                        processBarcode(barcode.substring(0, 12));
+                        scanning = false;
+                        document.getElementById('start-camera').textContent = 'Start Camera';
+                        
+                        // Hide scan guide
+                        if (scanGuide) {
+                            scanGuide.style.display = 'none';
+                            document.getElementById('scanner-container').classList.remove('scanning');
+                        }
+                        
+                        // Stop the camera
+                        stream.getTracks().forEach(track => track.stop());
+                        video.srcObject = null;
+                        
+                        // Vibrate on success
+                        if (navigator.vibrate) {
+                            navigator.vibrate(200);
+                        }
                     }
                 }
+            } catch (err) {
+                // No barcode found, continue scanning
             }
-        });
+            
+            if (scanning) {
+                requestAnimationFrame(scanLoop);
+            }
+        };
+        
+        scanLoop();
+        
     } catch (err) {
         console.error('Camera error:', err);
         let message = 'Camera access denied or not available. ';
