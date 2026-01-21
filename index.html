@@ -45,21 +45,13 @@
             
             <div class="scanner-controls">
                 <button class="btn" id="start-camera">Start Camera</button>
-                <button class="btn btn-secondary" id="toggle-manual">Enter Barcode Manually</button>
                 
-                <div class="manual-input" id="manual-input">
-                    <div class="input-group">
-                        <input type="text" id="barcode-input" placeholder="Enter 12-digit barcode" maxlength="12" pattern="[0-9]*" inputmode="numeric">
-                        <button class="btn" id="submit-barcode">Scan</button>
-                    </div>
-                </div>
-
                 <div id="camera-error" style="display: none;" class="camera-error"></div>
                 <div id="success-message" style="display: none;" class="success-message"></div>
                 
                 <div class="camera-info">
                     <strong>📱 Camera Scanning:</strong><br>
-                    Point camera at barcode and hold steady. Manual entry available as backup.
+                    Point camera at barcode and hold steady. Manual entry available in Settings.
                 </div>
             </div>
 
@@ -181,6 +173,17 @@
         </div>
 
         <div class="settings-container">
+            <div class="settings-section">
+                <h2>Manual Entry</h2>
+                <p class="settings-description">Enter barcodes manually if camera isn't working or you can't scan.</p>
+                <div class="manual-input active">
+                    <div class="input-group">
+                        <input type="text" id="barcode-input" placeholder="Enter 12-digit barcode" maxlength="12" pattern="[0-9]*" inputmode="numeric">
+                        <button class="btn" id="submit-barcode">Add Creature</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="settings-section">
                 <h2>Account</h2>
                 <div class="settings-item">

@@ -289,6 +289,7 @@ async function showDetail(barcode) {
         <div class="creature-card-full">
             <div class="card-header">
                 <div class="rarity-badge rarity-${data.rarity.toLowerCase()}">${data.rarity}</div>
+                ${data.specialTags && data.specialTags.length > 0 ? `<div class="special-tags-icons">${data.specialTags.map(tag => tag.icon).join(' ')}</div>` : ''}
                 <div class="scientific-name">${data.scientificName}</div>
                 <div class="common-name">${data.commonName}</div>
                 <div class="specimen-id">Specimen ID: ${barcode}</div>
@@ -351,6 +352,21 @@ async function showDetail(barcode) {
                     <span class="habitat-label">Temperament:</span>
                     <span class="habitat-tag">${data.stats.temperament}</span>
                 </div>
+                
+                ${data.specialTags && data.specialTags.length > 0 ? `
+                    <div class="section-title">Special Traits</div>
+                    <div class="special-traits-list">
+                        ${data.specialTags.map(tag => `
+                            <div class="special-trait-item">
+                                <span class="special-trait-icon">${tag.icon}</span>
+                                <div class="special-trait-info">
+                                    <div class="special-trait-name">${tag.name}</div>
+                                    <div class="special-trait-reason">${tag.reason}</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
             </div>
         </div>
     `;
@@ -496,11 +512,7 @@ document.getElementById('start-camera').onclick = async () => {
     }
 };
 
-// Manual input
-document.getElementById('toggle-manual').onclick = () => {
-    const input = document.getElementById('manual-input');
-    input.classList.toggle('active');
-};
+// Manual input - now in Settings page, no toggle needed
 
 document.getElementById('submit-barcode').onclick = () => {
     const barcode = document.getElementById('barcode-input').value;

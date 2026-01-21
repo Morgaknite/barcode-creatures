@@ -47,17 +47,86 @@ function generateCreatureData(barcode) {
     const sum = digits.reduce((a, b) => a + b);
     const uniqueDigits = new Set(digits).size;
     const patterns = {
-        allSame: uniqueDigits === 1,
         pairs: digits.filter((d, i) => i < 11 && d === digits[i + 1]).length,
         sequential: digits.filter((d, i) => i < 11 && d + 1 === digits[i + 1]).length
     };
     
+    // Check Mythic conditions
+    const firstHalf = barcode.substring(0, 6);
+    const secondHalf = barcode.substring(6, 12);
+    const isPalindrome = firstHalf === secondHalf.split('').reverse().join('');
+    const allPrimes = digits.every(d => [2, 3, 5, 7].includes(d));
+    const sumIs69 = sum === 69;
+    
     let rarity = 'Common';
-    if (patterns.allSame) rarity = 'Mythic';
-    else if (sum > 100 || sum < 10) rarity = 'Legendary';
-    else if (patterns.sequential >= 5) rarity = 'Epic';
-    else if (patterns.pairs >= 4) rarity = 'Rare';
-    else if (uniqueDigits <= 4) rarity = 'Uncommon';
+    if (isPalindrome || allPrimes || sumIs69) rarity = 'Mythic';
+    else if (digits.every(d => d % 2 === 0) || digits.every(d => d % 2 === 1)) rarity = 'Legendary';
+    else if (patterns.sequential >= 4) rarity = 'Epic';
+    else if (patterns.pairs >= 3) rarity = 'Rare';
+    else if (uniqueDigits <= 5) rarity = 'Uncommon';
+    
+    // Special Tags
+    const specialTags = [];
+    const barcodeStr = barcode;
+    
+    // Blazin' - contains 420
+    if (barcodeStr.includes('420')) {
+        specialTags.push({ icon: '🔥', name: 'Blazin\'', reason: 'Contains 420' });
+    }
+    
+    // Nice - contains 69 multiple times
+    const count69 = (barcodeStr.match(/69/g) || []).length;
+    if (count69 >= 4) {
+        specialTags.push({ icon: '😏', name: 'Very Nice', reason: `Contains 69 (x${count69})` });
+    } else if (count69 === 3) {
+        specialTags.push({ icon: '😏', name: 'Real Nice', reason: 'Contains 69 (x3)' });
+    } else if (count69 >= 2) {
+        specialTags.push({ icon: '😏', name: 'Nice', reason: 'Contains 69 (x2)' });
+    }
+    
+    // SixSeven - contains 67 twice
+    const count67 = (barcodeStr.match(/67/g) || []).length;
+    if (count67 >= 2) {
+        specialTags.push({ icon: '⚡', name: 'SixSeven', reason: `Contains 67 (x${count67})` });
+    }
+    
+    // Snake Eyes - contains 11 three+ times
+    const count11 = (barcodeStr.match(/11/g) || []).length;
+    if (count11 >= 3) {
+        specialTags.push({ icon: '🎲', name: 'Snake Eyes', reason: `Contains 11 (x${count11})` });
+    }
+    
+    // Jackpot - contains 777
+    if (barcodeStr.includes('777')) {
+        specialTags.push({ icon: '🎰', name: 'Jackpot', reason: 'Contains 777' });
+    }
+    
+    // Cursed - contains 666
+    if (barcodeStr.includes('666')) {
+        specialTags.push({ icon: '👹', name: 'Cursed', reason: 'Contains 666' });
+    }
+    
+    // Lucky - contains 1234 in sequence
+    if (barcodeStr.includes('1234')) {
+        specialTags.push({ icon: '🍀', name: 'Lucky', reason: 'Contains 1234' });
+    }
+    
+    // Perfect - contains 100 or 1000
+    if (barcodeStr.includes('1000')) {
+        specialTags.push({ icon: '💯', name: 'Perfect', reason: 'Contains 1000' });
+    } else if (barcodeStr.includes('100')) {
+        specialTags.push({ icon: '💯', name: 'Perfect', reason: 'Contains 100' });
+    }
+    
+    // Beats - contains 808
+    if (barcodeStr.includes('808')) {
+        specialTags.push({ icon: '🎵', name: 'Beats', reason: 'Contains 808' });
+    }
+    
+    // Reaper - contains 187
+    if (barcodeStr.includes('187')) {
+        specialTags.push({ icon: '💀', name: 'Reaper', reason: 'Contains 187' });
+    }
     
     // Body
     const bodyTypes = ['circle', 'square', 'triangle', 'pentagon', 'hexagon', 'octagon', 'ellipse'];
@@ -125,6 +194,7 @@ function generateCreatureData(barcode) {
         scientificName: `${genus} ${species}`,
         commonName,
         rarity,
+        specialTags,
         bodyType,
         bodyDescriptor,
         limbCount,
