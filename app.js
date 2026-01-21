@@ -237,7 +237,10 @@ async function renderCollection() {
             <div class="mini-info">
                 <div class="mini-name">${data.scientificName.split(' ')[0]}</div>
                 <div class="mini-common">${data.commonName}</div>
-                <div class="mini-rarity rarity-${data.rarity.toLowerCase()}">${data.rarity}</div>
+                <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
+                    <span class="mini-rarity rarity-${data.rarity.toLowerCase()}">${data.rarity}</span>
+                    ${data.specialTags && data.specialTags.length > 0 ? `<span style="font-size: 1.1rem; line-height: 1;">${data.specialTags.map(tag => tag.icon).join('')}</span>` : ''}
+                </div>
             </div>
         `;
 
