@@ -110,6 +110,69 @@
         </div>
     </div>
 
+    <!-- Stats Page -->
+    <div class="page" id="stats-page">
+        <div class="header">
+            <h1>📊 Statistics</h1>
+            <p class="subtitle">Your collection insights</p>
+        </div>
+
+        <div class="settings-container">
+            <div class="settings-section">
+                <h2>Collection Overview</h2>
+                <div class="stats-grid-large">
+                    <div class="stat-card">
+                        <div class="stat-card-icon">🎯</div>
+                        <div class="stat-card-value" id="total-creatures-stat">0</div>
+                        <div class="stat-card-label">Total Creatures</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-icon">⭐</div>
+                        <div class="stat-card-value" id="rarest-creature-stat">None</div>
+                        <div class="stat-card-label">Rarest Find</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-icon">🔥</div>
+                        <div class="stat-card-value" id="recent-scans-stat">0</div>
+                        <div class="stat-card-label">Scans This Week</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <h2>Rarity Breakdown</h2>
+                <div id="rarity-breakdown"></div>
+            </div>
+
+            <div class="settings-section">
+                <h2>Recent Discoveries</h2>
+                <div id="recent-discoveries"></div>
+            </div>
+
+            <div class="settings-section">
+                <h2>Top Stats</h2>
+                <div class="trait-grid">
+                    <div class="trait-item">
+                        <span class="trait-label">Most Common Body</span>
+                        <span class="trait-value" id="common-body">-</span>
+                    </div>
+                    <div class="trait-item">
+                        <span class="trait-label">Most Common Color</span>
+                        <span class="trait-value" id="common-color">-</span>
+                    </div>
+                    <div class="trait-item">
+                        <span class="trait-label">Avg Eyes per Creature</span>
+                        <span class="trait-value" id="avg-eyes">-</span>
+                    </div>
+                    <div class="trait-item">
+                        <span class="trait-label">Avg Limbs per Creature</span>
+                        <span class="trait-value" id="avg-limbs">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Settings Page -->
     <div class="page" id="settings-page">
         <div class="header">
@@ -198,6 +261,10 @@
         <button class="nav-btn" data-page="collection-page">
             <div class="nav-icon">📚</div>
             <div>Collection</div>
+        </button>
+        <button class="nav-btn" data-page="stats-page">
+            <div class="nav-icon">📊</div>
+            <div>Stats</div>
         </button>
         <button class="nav-btn" data-page="settings-page">
             <div class="nav-icon">⚙️</div>

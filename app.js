@@ -271,6 +271,19 @@ async function showDetail(barcode) {
             <button class="edit-source-btn" onclick="editSource('${barcode}')">Add</button>
         </div>
     `;
+    
+    // Format capture date
+    let captureDate = 'Unknown';
+    if (data.capturedAt) {
+        const date = data.capturedAt.toDate ? data.capturedAt.toDate() : new Date(data.capturedAt);
+        captureDate = date.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
 
     content.innerHTML = `
         <div class="creature-card-full">
@@ -285,6 +298,11 @@ async function showDetail(barcode) {
             </div>
             <div class="card-body">
                 ${sourceDisplay}
+                
+                <div class="habitat-bar">
+                    <span class="habitat-label">Captured:</span>
+                    <span class="habitat-tag">${captureDate}</span>
+                </div>
                 
                 <div class="section-title">Physical Traits</div>
                 <div class="trait-grid">
@@ -507,9 +525,118 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
 
         if (page === 'collection-page') {
             renderCollection();
+        } else if (page === 'stats-page') {
+            renderStats();
         }
     };
 });
+
+// Filters
+document.getElementById('rarity-filter').onchange = renderCollection;
+document.getElementById('sort-filter').onchange = renderCollection;
+
+// Stats Rendering
+async function renderStats() {
+    const collection = await loadCollection();
+    const entries = Object.entries(collection);
+    
+    // Total creatures
+    document.getElementById('total-creatures-stat').textContent = entries.length;
+    
+    if (entries.length === 0) {
+        document.getElementById('rarest-creature-stat').textContent = 'None';
+        document.getElementById('recent-scans-stat').textContent = '0';
+        document.getElementById('rarity-breakdown').innerHTML = '<p style="opacity: 0.7;">No creatures yet</p>';
+        document.getElementById('recent-discoveries').innerHTML = '<p style="opacity: 0.7;">Start scanning!</p>';
+        return;
+    }
+    
+    // Rarest creature (Mythic > Legendary > Epic > Rare > Uncommon > Common)
+    const rarityOrder = { 'Mythic': 6, 'Legendary': 5, 'Epic': 4, 'Rare': 3, 'Uncommon': 2, 'Common': 1 };
+    const rarest = entries.reduce((prev, curr) => 
+        rarityOrder[curr[1].rarity] > rarityOrder[prev[1].rarity] ? curr : prev
+    );
+    document.getElementById('rarest-creature-stat').textContent = rarest[1].rarity;
+    
+    // Recent scans (last 7 days)
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const recentCount = entries.filter(([_, data]) => {
+        if (!data.capturedAt) return false;
+        const captureDate = data.capturedAt.toDate ? data.capturedAt.toDate() : new Date(data.capturedAt);
+        return captureDate >= weekAgo;
+    }).length;
+    document.getElementById('recent-scans-stat').textContent = recentCount;
+    
+    // Rarity breakdown
+    const rarityCounts = {};
+    entries.forEach(([_, data]) => {
+        rarityCounts[data.rarity] = (rarityCounts[data.rarity] || 0) + 1;
+    });
+    
+    const rarityBreakdown = document.getElementById('rarity-breakdown');
+    rarityBreakdown.innerHTML = '';
+    ['Mythic', 'Legendary', 'Epic', 'Rare', 'Uncommon', 'Common'].forEach(rarity => {
+        const count = rarityCounts[rarity] || 0;
+        const percentage = ((count / entries.length) * 100).toFixed(1);
+        rarityBreakdown.innerHTML += `
+            <div class="rarity-bar">
+                <div class="rarity-bar-label">
+                    <span class="mini-rarity rarity-${rarity.toLowerCase()}">${rarity}</span>
+                    <span>${percentage}%</span>
+                </div>
+                <div class="rarity-bar-count">${count}</div>
+            </div>
+        `;
+    });
+    
+    // Recent discoveries (last 5)
+    const sorted = entries.sort((a, b) => {
+        const timeA = a[1].capturedAt?.toMillis?.() || 0;
+        const timeB = b[1].capturedAt?.toMillis?.() || 0;
+        return timeB - timeA;
+    });
+    
+    const recentDiscoveries = document.getElementById('recent-discoveries');
+    recentDiscoveries.innerHTML = '';
+    sorted.slice(0, 5).forEach(([barcode, data]) => {
+        let dateStr = 'Recently';
+        if (data.capturedAt) {
+            const date = data.capturedAt.toDate ? data.capturedAt.toDate() : new Date(data.capturedAt);
+            dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+        recentDiscoveries.innerHTML += `
+            <div class="recent-discovery-item" onclick="showDetail('${barcode}')">
+                <div>
+                    <div class="recent-discovery-name">${data.scientificName}</div>
+                    <div class="recent-discovery-date">${dateStr}</div>
+                </div>
+                <span class="mini-rarity rarity-${data.rarity.toLowerCase()}">${data.rarity}</span>
+            </div>
+        `;
+    });
+    
+    // Top stats
+    const bodyCounts = {};
+    const colorCounts = {};
+    let totalEyes = 0;
+    let totalLimbs = 0;
+    
+    entries.forEach(([_, data]) => {
+        bodyCounts[data.bodyDescriptor] = (bodyCounts[data.bodyDescriptor] || 0) + 1;
+        colorCounts[data.colors.paletteName] = (colorCounts[data.colors.paletteName] || 0) + 1;
+        totalEyes += data.eyeCount || 0;
+        totalLimbs += data.limbCount || 0;
+    });
+    
+    const mostCommonBody = Object.keys(bodyCounts).reduce((a, b) => bodyCounts[a] > bodyCounts[b] ? a : b, 'None');
+    const mostCommonColor = Object.keys(colorCounts).reduce((a, b) => colorCounts[a] > colorCounts[b] ? a : b, 'None');
+    
+    document.getElementById('common-body').textContent = mostCommonBody;
+    document.getElementById('common-color').textContent = mostCommonColor;
+    document.getElementById('avg-eyes').textContent = (totalEyes / entries.length).toFixed(1);
+    document.getElementById('avg-limbs').textContent = (totalLimbs / entries.length).toFixed(1);
+}
 
 // Filters
 document.getElementById('rarity-filter').onchange = renderCollection;
