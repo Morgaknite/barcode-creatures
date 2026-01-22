@@ -1,19 +1,28 @@
 // Main App Logic
 let currentUser = null;
+let currentUserProfile = null;
 let currentDiscoveryBarcode = null;
 let editingBarcode = null;
 let codeReader = null;
 let scanning = false;
 
 // Authentication State
-auth.onAuthStateChanged(user => {
+auth.onAuthStateChanged(async user => {
     if (user) {
         currentUser = user;
-        showApp();
-        updateUserInfo();
-        loadCollection();
+        
+        // Check if user has username
+        const hasUsername = await checkUsername();
+        if (!hasUsername) {
+            showUsernameModal();
+        } else {
+            showApp();
+            updateUserInfo();
+            loadCollection();
+        }
     } else {
         currentUser = null;
+        currentUserProfile = null;
         showLogin();
     }
 });
@@ -38,6 +47,117 @@ function updateUserInfo() {
     }
 }
 
+// Username Functions
+async function checkUsername() {
+    if (!currentUser) return false;
+    
+    try {
+        const doc = await db.collection('users').doc(currentUser.uid).get();
+        if (doc.exists && doc.data().username) {
+            currentUserProfile = doc.data();
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Error checking username:', error);
+        return false;
+    }
+}
+
+function showUsernameModal() {
+    document.getElementById('username-modal').classList.add('active');
+    document.getElementById('username-input').focus();
+}
+
+async function validateUsername(username) {
+    // Check format
+    if (!username || username.length === 0) {
+        return { valid: false, error: 'Username cannot be empty' };
+    }
+    
+    if (username.length > 20) {
+        return { valid: false, error: 'Username must be 20 characters or less' };
+    }
+    
+    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+        return { valid: false, error: 'Only letters, numbers, underscores, and hyphens allowed' };
+    }
+    
+    // Check uniqueness (case-insensitive)
+    const lowerUsername = username.toLowerCase();
+    try {
+        const doc = await db.collection('usernames').doc(lowerUsername).get();
+        if (doc.exists && doc.data().userId !== currentUser.uid) {
+            return { valid: false, error: 'Username already taken' };
+        }
+        return { valid: true };
+    } catch (error) {
+        console.error('Error validating username:', error);
+        return { valid: false, error: 'Error checking username availability' };
+    }
+}
+
+async function saveUsername(username) {
+    if (!currentUser) return false;
+    
+    const lowerUsername = username.toLowerCase();
+    
+    try {
+        // Save to users collection
+        await db.collection('users').doc(currentUser.uid).set({
+            username: username,
+            email: currentUser.email,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Claim username
+        await db.collection('usernames').doc(lowerUsername).set({
+            userId: currentUser.uid,
+            claimedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        currentUserProfile = { username, email: currentUser.email };
+        return true;
+    } catch (error) {
+        console.error('Error saving username:', error);
+        return false;
+    }
+}
+
+async function updateLeaderboard() {
+    if (!currentUser || !currentUserProfile) return;
+    
+    try {
+        const collection = await loadCollection();
+        const entries = Object.entries(collection);
+        
+        // Calculate stats
+        const rarityCounts = { Mythic: 0, Legendary: 0, Epic: 0, Rare: 0, Uncommon: 0, Common: 0 };
+        let specialTagCount = 0;
+        
+        entries.forEach(([_, data]) => {
+            rarityCounts[data.rarity] = (rarityCounts[data.rarity] || 0) + 1;
+            specialTagCount += (data.specialTags?.length || 0);
+        });
+        
+        // Update leaderboard
+        await db.collection('leaderboard').doc(currentUser.uid).set({
+            username: currentUserProfile.username,
+            totalCreatures: entries.length,
+            mythicCount: rarityCounts.Mythic,
+            legendaryCount: rarityCounts.Legendary,
+            epicCount: rarityCounts.Epic,
+            rareCount: rarityCounts.Rare,
+            uncommonCount: rarityCounts.Uncommon,
+            commonCount: rarityCounts.Common,
+            specialTagCount: specialTagCount,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    } catch (error) {
+        console.error('Error updating leaderboard:', error);
+    }
+}
+
 // Google Sign In
 document.getElementById('google-signin').onclick = async () => {
     const provider = new firebase.auth.GoogleAuthProvider();
@@ -47,6 +167,49 @@ document.getElementById('google-signin').onclick = async () => {
         alert('Sign in failed: ' + error.message);
     }
 };
+
+// Username Modal
+document.getElementById('save-username').onclick = async () => {
+    const username = document.getElementById('username-input').value.trim();
+    const errorEl = document.getElementById('username-error');
+    const saveBtn = document.getElementById('save-username');
+    
+    // Validate
+    const validation = await validateUsername(username);
+    if (!validation.valid) {
+        errorEl.textContent = validation.error;
+        errorEl.style.display = 'block';
+        return;
+    }
+    
+    // Save
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    
+    const success = await saveUsername(username);
+    if (success) {
+        document.getElementById('username-modal').classList.remove('active');
+        showApp();
+        updateUserInfo();
+        loadCollection();
+        await updateLeaderboard();
+    } else {
+        errorEl.textContent = 'Failed to save username. Please try again.';
+        errorEl.style.display = 'block';
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Continue';
+    }
+};
+
+document.getElementById('username-input').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        document.getElementById('save-username').click();
+    }
+});
+
+document.getElementById('username-input').addEventListener('input', () => {
+    document.getElementById('username-error').style.display = 'none';
+});
 
 // Sign Out
 document.getElementById('signout-btn').onclick = async () => {
@@ -167,6 +330,9 @@ async function processBarcode(barcode) {
     
     document.getElementById('last-scan').textContent = data.scientificName;
     updateStats();
+    
+    // Update leaderboard
+    await updateLeaderboard();
 }
 
 function showDiscovery(barcode, data) {
