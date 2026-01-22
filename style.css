@@ -162,9 +162,7 @@ body {
     max-width: 500px;
     border-radius: 15px;
     display: block;
-    margin: 0 auto 15px;
     background: black;
-    position: relative;
 }
 
 /* Scanner Visual Guide */
