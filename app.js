@@ -65,8 +65,11 @@ async function checkUsername() {
 }
 
 function showUsernameModal() {
+    // Hide login page first
+    document.getElementById('login-page').classList.remove('active');
+    // Show username modal
     document.getElementById('username-modal').classList.add('active');
-    document.getElementById('username-input').focus();
+    setTimeout(() => document.getElementById('username-input').focus(), 100);
 }
 
 async function validateUsername(username) {
