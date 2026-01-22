@@ -708,9 +708,106 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
             renderCollection();
         } else if (page === 'stats-page') {
             renderStats();
+        } else if (page === 'leaderboards-page') {
+            renderLeaderboards('total');
         }
     };
 });
+
+// Filters
+document.getElementById('rarity-filter').onchange = renderCollection;
+document.getElementById('sort-filter').onchange = renderCollection;
+
+// Leaderboards
+let currentLeaderboardCategory = 'total';
+
+document.querySelectorAll('.leaderboard-tab').forEach(tab => {
+    tab.onclick = () => {
+        const category = tab.dataset.category;
+        document.querySelectorAll('.leaderboard-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        renderLeaderboards(category);
+    };
+});
+
+async function renderLeaderboards(category) {
+    currentLeaderboardCategory = category;
+    const listEl = document.getElementById('leaderboard-list');
+    
+    listEl.innerHTML = '<div class="loading-state"><div class="loading-icon">🔄</div><p>Loading...</p></div>';
+    
+    try {
+        let query = db.collection('leaderboard');
+        
+        // Sort by category
+        if (category === 'total') {
+            query = query.orderBy('totalCreatures', 'desc').limit(100);
+        } else if (category === 'mythic') {
+            query = query.orderBy('mythicCount', 'desc').limit(100);
+        } else if (category === 'tags') {
+            query = query.orderBy('specialTagCount', 'desc').limit(100);
+        }
+        
+        const snapshot = await query.get();
+        
+        if (snapshot.empty) {
+            listEl.innerHTML = `
+                <div class="empty-leaderboard">
+                    <div class="empty-leaderboard-icon">🏆</div>
+                    <h2>No Rankings Yet</h2>
+                    <p>Be the first to appear on the leaderboard!</p>
+                </div>
+            `;
+            return;
+        }
+        
+        listEl.innerHTML = '';
+        let rank = 1;
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const isCurrentUser = currentUser && doc.id === currentUser.uid;
+            
+            let score, details;
+            if (category === 'total') {
+                score = data.totalCreatures || 0;
+                details = `${data.mythicCount || 0} Mythic • ${data.legendaryCount || 0} Legendary`;
+            } else if (category === 'mythic') {
+                score = data.mythicCount || 0;
+                details = `${data.totalCreatures || 0} total creatures`;
+            } else if (category === 'tags') {
+                score = data.specialTagCount || 0;
+                details = `${data.totalCreatures || 0} total creatures`;
+            }
+            
+            const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+            
+            const item = document.createElement('div');
+            item.className = `leaderboard-item${isCurrentUser ? ' current-user' : ''}`;
+            item.innerHTML = `
+                <div class="leaderboard-rank ${rankClass}">${rank}</div>
+                <div class="leaderboard-info">
+                    <div class="leaderboard-username">${data.username || 'Anonymous'}${isCurrentUser ? ' (You)' : ''}</div>
+                    <div class="leaderboard-details">${details}</div>
+                </div>
+                <div class="leaderboard-score">${score}</div>
+            `;
+            
+            listEl.appendChild(item);
+            rank++;
+        });
+        
+    } catch (error) {
+        console.error('Error loading leaderboard:', error);
+        listEl.innerHTML = `
+            <div class="empty-leaderboard">
+                <div class="empty-leaderboard-icon">⚠️</div>
+                <h2>Error Loading Leaderboard</h2>
+                <p>Please try again later.</p>
+            </div>
+        `;
+    }
+}
 
 // Filters
 document.getElementById('rarity-filter').onchange = renderCollection;

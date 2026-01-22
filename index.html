@@ -102,6 +102,29 @@
         </div>
     </div>
 
+    <!-- Leaderboards Page -->
+    <div class="page" id="leaderboards-page">
+        <div class="header">
+            <h1>🏆 Leaderboards</h1>
+            <p class="subtitle">Top collectors worldwide</p>
+        </div>
+
+        <div class="settings-container">
+            <div class="leaderboard-tabs">
+                <button class="leaderboard-tab active" data-category="total">Total Creatures</button>
+                <button class="leaderboard-tab" data-category="mythic">Mythic Hunter</button>
+                <button class="leaderboard-tab" data-category="tags">Special Tags</button>
+            </div>
+
+            <div class="leaderboard-list" id="leaderboard-list">
+                <div class="loading-state">
+                    <div class="loading-icon">🔄</div>
+                    <p>Loading leaderboards...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Stats Page -->
     <div class="page" id="stats-page">
         <div class="header">
@@ -276,6 +299,10 @@
         <button class="nav-btn" data-page="collection-page">
             <div class="nav-icon">📚</div>
             <div>Collection</div>
+        </button>
+        <button class="nav-btn" data-page="leaderboards-page">
+            <div class="nav-icon">🏆</div>
+            <div>Leaderboards</div>
         </button>
         <button class="nav-btn" data-page="stats-page">
             <div class="nav-icon">📊</div>
