@@ -165,11 +165,25 @@ async function updateLeaderboard() {
 document.getElementById('google-signin').onclick = async () => {
     const provider = new firebase.auth.GoogleAuthProvider();
     try {
-        await auth.signInWithPopup(provider);
+        // Use redirect instead of popup for better mobile compatibility
+        await auth.signInWithRedirect(provider);
     } catch (error) {
+        console.error('Sign in error:', error);
         alert('Sign in failed: ' + error.message);
     }
 };
+
+// Handle redirect result on page load
+auth.getRedirectResult().then((result) => {
+    if (result.user) {
+        console.log('Successfully signed in via redirect');
+    }
+}).catch((error) => {
+    console.error('Redirect result error:', error);
+    if (error.code !== 'auth/popup-closed-by-user') {
+        alert('Sign in error: ' + error.message);
+    }
+});
 
 // Username Modal
 document.getElementById('save-username').onclick = async () => {
