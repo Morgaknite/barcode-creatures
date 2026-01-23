@@ -793,16 +793,16 @@ async function renderLeaderboards(category) {
             const data = doc.data();
             const isCurrentUser = currentUser && doc.id === currentUser.uid;
             
-            let score, details;
+            let score, columnLabel;
             if (category === 'total') {
                 score = data.totalCreatures || 0;
-                details = `${data.mythicCount || 0} Mythic • ${data.legendaryCount || 0} Legendary`;
+                columnLabel = 'Total Creatures';
             } else if (category === 'mythic') {
                 score = data.mythicCount || 0;
-                details = `${data.totalCreatures || 0} total creatures`;
+                columnLabel = 'Mythic & Legendary';
             } else if (category === 'tags') {
                 score = data.specialTagCount || 0;
-                details = `${data.totalCreatures || 0} total creatures`;
+                columnLabel = 'Special Tags';
             }
             
             const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
@@ -813,7 +813,7 @@ async function renderLeaderboards(category) {
                 <div class="leaderboard-rank ${rankClass}">${rank}</div>
                 <div class="leaderboard-info">
                     <div class="leaderboard-username">${data.username || 'Anonymous'}${isCurrentUser ? ' (You)' : ''}</div>
-                    <div class="leaderboard-details">${details}</div>
+                    <div class="leaderboard-column-label">${columnLabel}</div>
                 </div>
                 <div class="leaderboard-score">${score}</div>
             `;

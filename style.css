@@ -1124,9 +1124,11 @@ body {
     margin-bottom: 4px;
 }
 
-.leaderboard-details {
-    font-size: 0.85rem;
-    opacity: 0.8;
+.leaderboard-column-label {
+    font-size: 0.75rem;
+    opacity: 0.6;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .leaderboard-score {
