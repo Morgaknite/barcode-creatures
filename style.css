@@ -1034,3 +1034,143 @@ body {
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+
+/* Leaderboards */
+.leaderboard-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 8px;
+}
+
+.leaderboard-tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.7);
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.leaderboard-tab.active {
+    background: rgba(255,255,255,0.2);
+    color: white;
+}
+
+.leaderboard-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.leaderboard-item {
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 15px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: transform 0.2s;
+}
+
+.leaderboard-item.current-user {
+    background: rgba(52, 152, 219, 0.3);
+    border: 2px solid #3498db;
+}
+
+.leaderboard-item:active {
+    transform: scale(0.98);
+}
+
+.leaderboard-rank {
+    font-size: 1.5rem;
+    font-weight: bold;
+    min-width: 40px;
+    text-align: center;
+    color: rgba(255,255,255,0.7);
+}
+
+.leaderboard-rank.gold {
+    color: #FFD700;
+    font-size: 2rem;
+}
+
+.leaderboard-rank.silver {
+    color: #C0C0C0;
+    font-size: 1.8rem;
+}
+
+.leaderboard-rank.bronze {
+    color: #CD7F32;
+    font-size: 1.6rem;
+}
+
+.leaderboard-info {
+    flex: 1;
+}
+
+.leaderboard-username {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.leaderboard-details {
+    font-size: 0.85rem;
+    opacity: 0.8;
+}
+
+.leaderboard-score {
+    font-size: 1.5rem;
+    font-weight: bold;
+    min-width: 50px;
+    text-align: right;
+    color: #3498db;
+}
+
+.loading-state {
+    text-align: center;
+    padding: 60px 20px;
+    opacity: 0.7;
+}
+
+.loading-icon {
+    font-size: 3rem;
+    margin-bottom: 15px;
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.empty-leaderboard {
+    text-align: center;
+    padding: 60px 20px;
+    opacity: 0.7;
+}
+
+.empty-leaderboard-icon {
+    font-size: 4rem;
+    margin-bottom: 20px;
+}
+
+.empty-leaderboard h2 {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+}
+
+.empty-leaderboard p {
+    font-size: 1rem;
+    opacity: 0.8;
+}
