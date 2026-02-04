@@ -347,11 +347,27 @@ async function processBarcode(barcode) {
         return;
     }
 
+    // Show loading message
+    showSuccess('Scanning... Looking up product info...');
+    
     const data = generateCreatureData(barcode);
-    await saveCreature(barcode, data);
+    
+    // Try to lookup product info
+    let productName = '';
+    try {
+        const productInfo = await lookupProduct(barcode);
+        if (productInfo) {
+            productName = productInfo;
+            console.log('Found product:', productName);
+        }
+    } catch (error) {
+        console.log('Product lookup failed, continuing anyway:', error);
+    }
+    
+    await saveCreature(barcode, data, productName);
     
     // Show discovery modal
-    showDiscovery(barcode, data);
+    showDiscovery(barcode, data, productName);
     
     document.getElementById('last-scan').textContent = data.scientificName;
     updateStats();
@@ -360,14 +376,59 @@ async function processBarcode(barcode) {
     await updateLeaderboard();
 }
 
-function showDiscovery(barcode, data) {
+// Product Lookup Function
+async function lookupProduct(barcode) {
+    try {
+        // Try UPCitemdb first
+        const response = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`);
+        
+        if (!response.ok) {
+            throw new Error('API request failed');
+        }
+        
+        const data = await response.json();
+        
+        if (data.items && data.items.length > 0) {
+            const item = data.items[0];
+            return item.title || item.brand || 'Unknown Product';
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Product lookup error:', error);
+        
+        // Fallback: Try Open Food Facts for food items
+        try {
+            const offResponse = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+            const offData = await offResponse.json();
+            
+            if (offData.status === 1 && offData.product) {
+                return offData.product.product_name || null;
+            }
+        } catch (offError) {
+            console.error('Open Food Facts lookup failed:', offError);
+        }
+        
+        return null;
+    }
+}
+
+function showDiscovery(barcode, data, productName = '') {
     currentDiscoveryBarcode = barcode;
     const modal = document.getElementById('discovery-modal');
     const canvas = document.getElementById('discovery-canvas');
     
     document.getElementById('discovery-scientific').textContent = data.scientificName;
     document.getElementById('discovery-common').textContent = data.commonName;
-    document.getElementById('discovery-source-input').value = '';
+    
+    // Pre-fill with product name if found
+    const sourceInput = document.getElementById('discovery-source-input');
+    sourceInput.value = productName;
+    if (productName) {
+        sourceInput.placeholder = 'Product auto-detected!';
+    } else {
+        sourceInput.placeholder = 'e.g., PS5 box, Shampoo bottle';
+    }
     
     const rarityBadge = document.getElementById('discovery-rarity');
     rarityBadge.textContent = data.rarity;
