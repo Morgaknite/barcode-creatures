@@ -61,11 +61,22 @@ body {
     gap: 12px;
     font-size: 1.1rem;
     padding: 15px;
-    margin-bottom: 20px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
 }
 
 .btn-google:hover {
     background: #f8f9fa;
+    transform: translateY(-1px);
+}
+
+.btn-google:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
 }
 
 .google-icon {
@@ -79,6 +90,125 @@ body {
     font-size: 0.85rem;
     opacity: 0.7;
     line-height: 1.5;
+}
+
+/* Login Status/Error Messages */
+.login-status {
+    background: rgba(52, 152, 219, 0.9);
+    color: white;
+    padding: 12px 15px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+.login-error {
+    background: rgba(231, 76, 60, 0.9);
+    color: white;
+    padding: 12px 15px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+/* Auth Divider */
+.auth-divider {
+    display: flex;
+    align-items: center;
+    margin: 25px 0;
+    color: rgba(255,255,255,0.6);
+    font-size: 0.85rem;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255,255,255,0.3);
+}
+
+.auth-divider span {
+    padding: 0 15px;
+}
+
+/* Email Auth Form */
+.email-auth-form {
+    margin-bottom: 20px;
+}
+
+.input-group-auth {
+    margin-bottom: 12px;
+}
+
+.auth-input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.1);
+    color: white;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.auth-input::placeholder {
+    color: rgba(255,255,255,0.5);
+}
+
+.auth-input:focus {
+    outline: none;
+    border-color: rgba(52, 152, 219, 0.8);
+    background: rgba(255,255,255,0.15);
+}
+
+.btn-email {
+    width: 100%;
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+    border: none;
+    padding: 14px;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 12px;
+}
+
+.btn-email:hover {
+    background: linear-gradient(135deg, #2980b9, #1f6dad);
+    transform: translateY(-1px);
+}
+
+.btn-email:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.auth-links {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.auth-link {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.7);
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 5px;
+    transition: color 0.3s;
+}
+
+.auth-link:hover {
+    color: white;
+    text-decoration: underline;
 }
 
 /* Navigation */

@@ -18,4 +18,16 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 
+// Set auth persistence to LOCAL (survives browser restarts)
+// This helps with mobile browsers that may clear session storage
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+  .then(() => {
+    console.log('Auth persistence set to LOCAL');
+  })
+  .catch((error) => {
+    console.warn('Could not set auth persistence:', error);
+  });
+
 console.log('Firebase initialized successfully!');
+console.log('Auth domain:', firebaseConfig.authDomain);
+console.log('Current domain:', window.location.hostname);

@@ -6,18 +6,42 @@ let editingBarcode = null;
 let codeReader = null;
 let scanning = false;
 
+// Debug logging helper
+function debugLog(message, data = null) {
+    const timestamp = new Date().toISOString();
+    if (data) {
+        console.log(`[${timestamp}] ${message}`, data);
+    } else {
+        console.log(`[${timestamp}] ${message}`);
+    }
+}
+
+// Show status message on login page
+function showLoginStatus(message, isError = false) {
+    const statusEl = document.getElementById('login-status');
+    const errorEl = document.getElementById('login-error');
+    
+    if (isError) {
+        if (errorEl) {
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+        }
+        if (statusEl) statusEl.style.display = 'none';
+    } else {
+        if (statusEl) {
+            statusEl.textContent = message;
+            statusEl.style.display = 'block';
+        }
+        if (errorEl) errorEl.style.display = 'none';
+    }
+}
+
 // Authentication State
 auth.onAuthStateChanged(async user => {
-    console.log('Auth state changed:', user ? user.email : 'no user');
-    
-    // Show status
-    const statusEl = document.getElementById('login-status');
-    if (statusEl && user) {
-        statusEl.textContent = 'Signed in as ' + user.email + '. Loading your collection...';
-        statusEl.style.display = 'block';
-    }
+    debugLog('Auth state changed:', user ? user.email : 'no user');
     
     if (user) {
+        showLoginStatus('Signed in as ' + user.email + '. Loading your collection...');
         currentUser = user;
         
         // Check if user has username
@@ -36,55 +60,68 @@ auth.onAuthStateChanged(async user => {
     }
 });
 
-// Handle redirect result IMMEDIATELY on page load (before auth state change)
-(async function() {
+// Handle redirect result - wait for Firebase to be ready
+async function handleRedirectResult() {
     try {
-        console.log('Checking for redirect result...');
+        debugLog('Checking for redirect result...');
+        showLoginStatus('Checking authentication...');
+        
         const result = await auth.getRedirectResult();
         
-        if (result.user) {
-            console.log('User signed in via redirect:', result.user.email);
-            // Show success on login page briefly
-            const errorEl = document.getElementById('login-error');
-            if (errorEl) {
-                errorEl.style.background = 'rgba(46, 204, 113, 0.9)';
-                errorEl.textContent = 'Sign in successful! Loading...';
-                errorEl.style.display = 'block';
-            }
+        if (result && result.user) {
+            debugLog('User signed in via redirect:', result.user.email);
+            showLoginStatus('Sign in successful! Loading...');
             // Auth state change will handle the rest
         } else {
-            console.log('No redirect result found');
+            debugLog('No redirect result found (this is normal on first visit)');
         }
     } catch (error) {
-        console.error('Redirect result error:', error);
+        debugLog('Redirect result error:', error);
         
-        // Show error on login page
-        const errorEl = document.getElementById('login-error');
-        if (errorEl) {
-            let errorMessage = '';
-            
-            if (error.code === 'auth/account-exists-with-different-credential') {
+        let errorMessage = '';
+        
+        switch (error.code) {
+            case 'auth/account-exists-with-different-credential':
                 errorMessage = 'An account already exists with this email using a different sign-in method.';
-            } else if (error.code === 'auth/network-request-failed') {
+                break;
+            case 'auth/network-request-failed':
                 errorMessage = 'Network error. Please check your internet connection and try again.';
-            } else if (error.code === 'auth/unauthorized-domain') {
-                errorMessage = 'ERROR: This domain (morgaknite.github.io) is not authorized in Firebase. The developer needs to add it in Firebase Console > Authentication > Settings > Authorized domains.';
-            } else if (error.code && error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
-                errorMessage = 'Sign in error: ' + error.message;
-            }
-            
-            if (errorMessage) {
-                errorEl.textContent = errorMessage;
-                errorEl.style.display = 'block';
-            }
+                break;
+            case 'auth/unauthorized-domain':
+                errorMessage = `ERROR: Domain not authorized. Current domain: ${window.location.hostname}. Add it to Firebase Console > Authentication > Settings > Authorized domains.`;
+                break;
+            case 'auth/popup-closed-by-user':
+            case 'auth/cancelled-popup-request':
+                // User closed popup, not an error
+                break;
+            case 'auth/internal-error':
+                errorMessage = 'Authentication error. Please try again. If using an ad blocker, try disabling it.';
+                break;
+            default:
+                if (error.code && error.message) {
+                    errorMessage = `Sign in error (${error.code}): ${error.message}`;
+                }
+        }
+        
+        if (errorMessage) {
+            showLoginStatus(errorMessage, true);
         }
     }
-})();
+}
+
+// Call redirect handler after a short delay to ensure Firebase is fully initialized
+setTimeout(handleRedirectResult, 500);
 
 function showLogin() {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById('login-page').classList.add('active');
     document.getElementById('main-nav').style.display = 'none';
+    
+    // Clear any previous status/error messages
+    const statusEl = document.getElementById('login-status');
+    const errorEl = document.getElementById('login-error');
+    if (statusEl) statusEl.style.display = 'none';
+    if (errorEl) errorEl.style.display = 'none';
 }
 
 function showApp() {
@@ -143,20 +180,16 @@ async function validateUsername(username) {
     // Check uniqueness (case-insensitive)
     const lowerUsername = username.toLowerCase();
     try {
-        // Try to get the username document
         const doc = await db.collection('usernames').doc(lowerUsername).get();
         if (doc.exists) {
             const data = doc.data();
-            // If it exists and belongs to someone else, it's taken
             if (data.userId && data.userId !== currentUser.uid) {
                 return { valid: false, error: 'Username already taken' };
             }
         }
-        // Username is available
         return { valid: true };
     } catch (error) {
         console.error('Error validating username:', error);
-        // If we can't check (permissions issue), allow it and let the save operation handle it
         console.log('Cannot check username availability, proceeding anyway');
         return { valid: true };
     }
@@ -168,14 +201,12 @@ async function saveUsername(username) {
     const lowerUsername = username.toLowerCase();
     
     try {
-        // Save to users collection
         await db.collection('users').doc(currentUser.uid).set({
             username: username,
             email: currentUser.email,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        // Claim username
         await db.collection('usernames').doc(lowerUsername).set({
             userId: currentUser.uid,
             claimedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -196,7 +227,6 @@ async function updateLeaderboard() {
         const collection = await loadCollection();
         const entries = Object.entries(collection);
         
-        // Calculate stats
         const rarityCounts = { Mythic: 0, Legendary: 0, Epic: 0, Rare: 0, Uncommon: 0, Common: 0 };
         let specialTagCount = 0;
         
@@ -205,7 +235,6 @@ async function updateLeaderboard() {
             specialTagCount += (data.specialTags?.length || 0);
         });
         
-        // Update leaderboard
         await db.collection('leaderboard').doc(currentUser.uid).set({
             username: currentUserProfile.username,
             totalCreatures: entries.length,
@@ -223,78 +252,281 @@ async function updateLeaderboard() {
     }
 }
 
-// Google Sign In - Try popup first, fallback to redirect
+// ==========================================
+// GOOGLE SIGN IN
+// ==========================================
 document.getElementById('google-signin').onclick = async () => {
     const provider = new firebase.auth.GoogleAuthProvider();
     const signInBtn = document.getElementById('google-signin');
-    const errorEl = document.getElementById('login-error');
     
     try {
         signInBtn.disabled = true;
         signInBtn.innerHTML = '<span class="google-icon">G</span> Signing in...';
+        showLoginStatus('Opening Google sign-in...');
         
-        console.log('Attempting popup sign in...');
+        debugLog('Starting Google sign-in...');
+        debugLog('Current URL:', window.location.href);
+        debugLog('Auth domain:', auth.app.options.authDomain);
         
-        // Try popup first (more reliable)
-        try {
-            const result = await auth.signInWithPopup(provider);
-            console.log('Popup sign in successful:', result.user.email);
-            // Auth state change will handle the rest
-        } catch (popupError) {
-            console.log('Popup failed, trying redirect:', popupError.code);
-            
-            // If popup fails, try redirect
-            if (popupError.code === 'auth/popup-blocked' || 
-                popupError.code === 'auth/popup-closed-by-user' ||
-                popupError.code === 'auth/cancelled-popup-request') {
-                console.log('Using redirect instead...');
-                await auth.signInWithRedirect(provider);
-                return; // Exit - redirect will reload page
-            } else {
-                throw popupError; // Re-throw other errors
+        // Detect if we're on mobile
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        debugLog('Is mobile:', isMobile);
+        
+        // On mobile, use redirect (more reliable)
+        // On desktop, try popup first
+        if (isMobile) {
+            debugLog('Using redirect method (mobile)...');
+            showLoginStatus('Redirecting to Google...');
+            await auth.signInWithRedirect(provider);
+            // Page will redirect, no code after this runs
+        } else {
+            // Desktop - try popup first
+            try {
+                debugLog('Trying popup method (desktop)...');
+                const result = await auth.signInWithPopup(provider);
+                debugLog('Popup sign in successful:', result.user.email);
+                // Auth state change will handle the rest
+            } catch (popupError) {
+                debugLog('Popup failed:', popupError.code);
+                
+                // If popup fails, fall back to redirect
+                if (popupError.code === 'auth/popup-blocked' || 
+                    popupError.code === 'auth/popup-closed-by-user' ||
+                    popupError.code === 'auth/cancelled-popup-request') {
+                    debugLog('Falling back to redirect...');
+                    showLoginStatus('Popup blocked, redirecting...');
+                    await auth.signInWithRedirect(provider);
+                } else {
+                    throw popupError;
+                }
             }
         }
         
     } catch (error) {
-        console.error('Sign in error:', error);
+        debugLog('Sign in error:', error);
         signInBtn.disabled = false;
         signInBtn.innerHTML = '<span class="google-icon">G</span> Sign in with Google';
         
         let errorMessage = 'Sign in failed. ';
-        if (error.code === 'auth/popup-blocked') {
-            errorMessage = 'Popup was blocked. Trying redirect method...';
-            // Try redirect as fallback
-            try {
-                await auth.signInWithRedirect(provider);
-                return;
-            } catch (redirectError) {
-                errorMessage = 'Both popup and redirect failed: ' + redirectError.message;
-            }
-        } else if (error.code === 'auth/network-request-failed') {
-            errorMessage += 'Network error. Please check your internet connection.';
-        } else if (error.code === 'auth/unauthorized-domain') {
-            errorMessage += 'Domain not authorized. Domain: ' + window.location.hostname;
-        } else {
-            errorMessage += error.message;
+        
+        switch (error.code) {
+            case 'auth/popup-blocked':
+                errorMessage = 'Popup blocked. Please allow popups or try again.';
+                break;
+            case 'auth/network-request-failed':
+                errorMessage += 'Network error. Please check your internet connection.';
+                break;
+            case 'auth/unauthorized-domain':
+                errorMessage += `Domain not authorized: ${window.location.hostname}`;
+                break;
+            case 'auth/operation-not-allowed':
+                errorMessage += 'Google sign-in is not enabled in Firebase.';
+                break;
+            case 'auth/internal-error':
+                errorMessage += 'Internal error. Please try again.';
+                break;
+            default:
+                errorMessage += error.message || 'Unknown error occurred.';
         }
         
-        if (errorEl) {
-            errorEl.textContent = errorMessage;
-            errorEl.style.display = 'block';
-        }
+        showLoginStatus(errorMessage, true);
     }
 };
 
-// Username Modal
+// ==========================================
+// EMAIL/PASSWORD SIGN IN
+// ==========================================
+
+// Toggle between sign in and sign up mode
+let isSignUpMode = false;
+
+function toggleAuthMode() {
+    isSignUpMode = !isSignUpMode;
+    const toggleBtn = document.getElementById('email-toggle-mode');
+    const submitBtn = document.getElementById('email-submit');
+    const confirmPasswordGroup = document.getElementById('confirm-password-group');
+    
+    if (isSignUpMode) {
+        toggleBtn.textContent = 'Already have an account? Sign In';
+        submitBtn.textContent = 'Create Account';
+        if (confirmPasswordGroup) confirmPasswordGroup.style.display = 'block';
+    } else {
+        toggleBtn.textContent = "Don't have an account? Sign Up";
+        submitBtn.textContent = 'Sign In';
+        if (confirmPasswordGroup) confirmPasswordGroup.style.display = 'none';
+    }
+}
+
+async function handleEmailAuth() {
+    const email = document.getElementById('email-input').value.trim();
+    const password = document.getElementById('password-input').value;
+    const confirmPassword = document.getElementById('confirm-password-input')?.value;
+    const submitBtn = document.getElementById('email-submit');
+    
+    // Validation
+    if (!email || !password) {
+        showLoginStatus('Please enter email and password', true);
+        return;
+    }
+    
+    if (isSignUpMode && password !== confirmPassword) {
+        showLoginStatus('Passwords do not match', true);
+        return;
+    }
+    
+    if (password.length < 6) {
+        showLoginStatus('Password must be at least 6 characters', true);
+        return;
+    }
+    
+    try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = isSignUpMode ? 'Creating account...' : 'Signing in...';
+        showLoginStatus(isSignUpMode ? 'Creating your account...' : 'Signing you in...');
+        
+        if (isSignUpMode) {
+            debugLog('Creating new account:', email);
+            const result = await auth.createUserWithEmailAndPassword(email, password);
+            debugLog('Account created:', result.user.email);
+        } else {
+            debugLog('Signing in with email:', email);
+            const result = await auth.signInWithEmailAndPassword(email, password);
+            debugLog('Signed in:', result.user.email);
+        }
+        // Auth state change will handle the rest
+        
+    } catch (error) {
+        debugLog('Email auth error:', error);
+        submitBtn.disabled = false;
+        submitBtn.textContent = isSignUpMode ? 'Create Account' : 'Sign In';
+        
+        let errorMessage = '';
+        
+        switch (error.code) {
+            case 'auth/email-already-in-use':
+                errorMessage = 'This email is already registered. Try signing in instead.';
+                break;
+            case 'auth/invalid-email':
+                errorMessage = 'Please enter a valid email address.';
+                break;
+            case 'auth/weak-password':
+                errorMessage = 'Password is too weak. Use at least 6 characters.';
+                break;
+            case 'auth/user-not-found':
+                errorMessage = 'No account found with this email. Try signing up instead.';
+                break;
+            case 'auth/wrong-password':
+                errorMessage = 'Incorrect password. Please try again.';
+                break;
+            case 'auth/invalid-credential':
+                errorMessage = 'Invalid email or password. Please check and try again.';
+                break;
+            case 'auth/too-many-requests':
+                errorMessage = 'Too many failed attempts. Please try again later.';
+                break;
+            case 'auth/network-request-failed':
+                errorMessage = 'Network error. Please check your connection.';
+                break;
+            default:
+                errorMessage = error.message || 'Authentication failed. Please try again.';
+        }
+        
+        showLoginStatus(errorMessage, true);
+    }
+}
+
+// Password reset
+async function handlePasswordReset() {
+    const email = document.getElementById('email-input').value.trim();
+    
+    if (!email) {
+        showLoginStatus('Please enter your email address first', true);
+        return;
+    }
+    
+    try {
+        showLoginStatus('Sending password reset email...');
+        await auth.sendPasswordResetEmail(email);
+        showLoginStatus('Password reset email sent! Check your inbox.');
+    } catch (error) {
+        debugLog('Password reset error:', error);
+        
+        let errorMessage = '';
+        switch (error.code) {
+            case 'auth/user-not-found':
+                errorMessage = 'No account found with this email.';
+                break;
+            case 'auth/invalid-email':
+                errorMessage = 'Please enter a valid email address.';
+                break;
+            default:
+                errorMessage = error.message || 'Failed to send reset email.';
+        }
+        showLoginStatus(errorMessage, true);
+    }
+}
+
+// Attach event listeners for email auth (will be attached after DOM is ready)
+document.addEventListener('DOMContentLoaded', () => {
+    const emailSubmit = document.getElementById('email-submit');
+    const emailToggle = document.getElementById('email-toggle-mode');
+    const forgotPassword = document.getElementById('forgot-password');
+    const emailInput = document.getElementById('email-input');
+    const passwordInput = document.getElementById('password-input');
+    
+    if (emailSubmit) {
+        emailSubmit.onclick = handleEmailAuth;
+    }
+    
+    if (emailToggle) {
+        emailToggle.onclick = toggleAuthMode;
+    }
+    
+    if (forgotPassword) {
+        forgotPassword.onclick = handlePasswordReset;
+    }
+    
+    // Enter key handlers
+    if (emailInput) {
+        emailInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                passwordInput?.focus();
+            }
+        });
+    }
+    
+    if (passwordInput) {
+        passwordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                if (isSignUpMode) {
+                    document.getElementById('confirm-password-input')?.focus();
+                } else {
+                    handleEmailAuth();
+                }
+            }
+        });
+    }
+    
+    const confirmPasswordInput = document.getElementById('confirm-password-input');
+    if (confirmPasswordInput) {
+        confirmPasswordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleEmailAuth();
+            }
+        });
+    }
+});
+
+// ==========================================
+// USERNAME MODAL
+// ==========================================
 document.getElementById('save-username').onclick = async () => {
     const username = document.getElementById('username-input').value.trim();
     const errorEl = document.getElementById('username-error');
     const saveBtn = document.getElementById('save-username');
     
-    // Clear previous errors
     errorEl.style.display = 'none';
     
-    // Validate
     const validation = await validateUsername(username);
     if (!validation.valid) {
         errorEl.textContent = validation.error;
@@ -302,7 +534,6 @@ document.getElementById('save-username').onclick = async () => {
         return;
     }
     
-    // Save
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving...';
     
@@ -348,7 +579,6 @@ async function saveCreature(barcode, data, sourceItem = '') {
     if (!currentUser) return;
     
     try {
-        // Remove the rng object before saving (Firebase doesn't support it)
         const { rng, ...cleanData } = data;
         
         await db.collection('users').doc(currentUser.uid).collection('creatures').doc(barcode).set({
@@ -447,12 +677,10 @@ async function processBarcode(barcode) {
         return;
     }
 
-    // Show loading message
     showSuccess('Scanning... Looking up product info...');
     
     const data = generateCreatureData(barcode);
     
-    // Try to lookup product info
     let productName = '';
     try {
         const productInfo = await lookupProduct(barcode);
@@ -466,23 +694,19 @@ async function processBarcode(barcode) {
     
     await saveCreature(barcode, data, productName);
     
-    // Show discovery modal
     showDiscovery(barcode, data, productName);
     
     document.getElementById('last-scan').textContent = data.scientificName;
     updateStats();
     
-    // Update leaderboard
     await updateLeaderboard();
 }
 
-// Product Lookup Function - tries multiple APIs
+// Product Lookup Function
 async function lookupProduct(barcode) {
     console.log('Looking up product for barcode:', barcode);
     
-    // Try multiple APIs in sequence
     const apis = [
-        // API 1: UPCitemdb (good general coverage)
         async () => {
             try {
                 const response = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`);
@@ -499,7 +723,6 @@ async function lookupProduct(barcode) {
             }
         },
         
-        // API 2: Open Food Facts (food/drinks)
         async () => {
             try {
                 const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
@@ -515,7 +738,6 @@ async function lookupProduct(barcode) {
             }
         },
         
-        // API 3: UPCDatabase.org (another good option)
         async () => {
             try {
                 const response = await fetch(`https://api.upcdatabase.org/product/${barcode}`);
@@ -531,7 +753,6 @@ async function lookupProduct(barcode) {
             }
         },
         
-        // API 4: Barcodelookup.com
         async () => {
             try {
                 const response = await fetch(`https://api.barcodelookup.com/v3/products?barcode=${barcode}&formatted=y&key=trial`);
@@ -548,7 +769,6 @@ async function lookupProduct(barcode) {
         }
     ];
     
-    // Try each API until one succeeds
     for (const apiFunc of apis) {
         try {
             const result = await apiFunc();
@@ -557,7 +777,6 @@ async function lookupProduct(barcode) {
                 return result;
             }
         } catch (error) {
-            // Continue to next API
             continue;
         }
     }
@@ -574,7 +793,6 @@ function showDiscovery(barcode, data, productName = '') {
     document.getElementById('discovery-scientific').textContent = data.scientificName;
     document.getElementById('discovery-common').textContent = data.commonName;
     
-    // Pre-fill with product name if found
     const sourceInput = document.getElementById('discovery-source-input');
     sourceInput.value = productName;
     if (productName) {
@@ -606,7 +824,6 @@ async function renderCollection() {
 
     emptyState.style.display = 'none';
 
-    // Apply filters
     const rarityFilter = document.getElementById('rarity-filter').value;
     const sortFilter = document.getElementById('sort-filter').value;
 
@@ -615,7 +832,6 @@ async function renderCollection() {
         filtered = filtered.filter(([_, data]) => data.rarity === rarityFilter);
     }
 
-    // Sort
     if (sortFilter === 'recent') {
         filtered.sort((a, b) => {
             const timeA = a[1].capturedAt?.toMillis?.() || 0;
@@ -680,7 +896,6 @@ async function showDetail(barcode) {
         </div>
     `;
     
-    // Format capture date
     let captureDate = 'Unknown';
     if (data.capturedAt) {
         const date = data.capturedAt.toDate ? data.capturedAt.toDate() : new Date(data.capturedAt);
@@ -804,7 +1019,6 @@ let activeStream = null;
 document.getElementById('start-camera').onclick = async () => {
     const startBtn = document.getElementById('start-camera');
     
-    // If already scanning, stop it
     if (scanning) {
         scanning = false;
         if (activeStream) {
@@ -839,7 +1053,6 @@ document.getElementById('start-camera').onclick = async () => {
         activeStream = stream;
         video.srcObject = stream;
         
-        // Wait for video to be ready
         await video.play();
 
         codeReader = new ZXing.BrowserMultiFormatReader();
@@ -848,51 +1061,42 @@ document.getElementById('start-camera').onclick = async () => {
         startBtn.textContent = 'Stop Camera';
         document.getElementById('camera-error').style.display = 'none';
         
-        // Show scan guide
         const scanGuide = document.getElementById('scan-guide');
         if (scanGuide) {
             scanGuide.style.display = 'block';
             document.getElementById('scanner-container').classList.add('scanning');
         }
 
-        // Use the callback-based continuous scanning (it actually works better)
         codeReader.decodeFromVideoDevice(undefined, 'video', (result, error) => {
             if (result) {
                 const barcode = result.text;
                 console.log('Detected barcode:', barcode);
                 
-                // Only process valid 12-13 digit barcodes
                 if (/^\d{12,13}$/.test(barcode)) {
                     console.log('Valid barcode found:', barcode);
                     
-                    // Process it
                     processBarcode(barcode.substring(0, 12));
                     
-                    // Stop scanning
                     scanning = false;
                     codeReader.reset();
                     startBtn.textContent = 'Start Camera';
                     
-                    // Hide scan guide
                     if (scanGuide) {
                         scanGuide.style.display = 'none';
                         document.getElementById('scanner-container').classList.remove('scanning');
                     }
                     
-                    // Stop the camera
                     if (activeStream) {
                         activeStream.getTracks().forEach(track => track.stop());
                         activeStream = null;
                     }
                     video.srcObject = null;
                     
-                    // Vibrate on success
                     if (navigator.vibrate) {
                         navigator.vibrate(200);
                     }
                 }
             }
-            // Errors are normal - just means no barcode detected in this frame
         });
         
     } catch (err) {
@@ -911,7 +1115,6 @@ document.getElementById('start-camera').onclick = async () => {
         showError(message);
         document.getElementById('start-camera').textContent = 'Start Camera';
         
-        // Hide scan guide on error
         const scanGuide = document.getElementById('scan-guide');
         if (scanGuide) {
             scanGuide.style.display = 'none';
@@ -919,8 +1122,6 @@ document.getElementById('start-camera').onclick = async () => {
         }
     }
 };
-
-// Manual input - now in Settings page, no toggle needed
 
 document.getElementById('submit-barcode').onclick = () => {
     const barcode = document.getElementById('barcode-input').value;
@@ -978,7 +1179,6 @@ async function renderLeaderboards(category) {
     try {
         let query = db.collection('leaderboard');
         
-        // Sort by category
         if (category === 'total') {
             query = query.orderBy('totalCreatures', 'desc').limit(100);
         } else if (category === 'mythic') {
@@ -1048,16 +1248,11 @@ async function renderLeaderboards(category) {
     }
 }
 
-// Filters
-document.getElementById('rarity-filter').onchange = renderCollection;
-document.getElementById('sort-filter').onchange = renderCollection;
-
 // Stats Rendering
 async function renderStats() {
     const collection = await loadCollection();
     const entries = Object.entries(collection);
     
-    // Total creatures
     document.getElementById('total-creatures-stat').textContent = entries.length;
     
     if (entries.length === 0) {
@@ -1068,14 +1263,12 @@ async function renderStats() {
         return;
     }
     
-    // Rarest creature (Mythic > Legendary > Epic > Rare > Uncommon > Common)
     const rarityOrder = { 'Mythic': 6, 'Legendary': 5, 'Epic': 4, 'Rare': 3, 'Uncommon': 2, 'Common': 1 };
     const rarest = entries.reduce((prev, curr) => 
         rarityOrder[curr[1].rarity] > rarityOrder[prev[1].rarity] ? curr : prev
     );
     document.getElementById('rarest-creature-stat').textContent = rarest[1].rarity;
     
-    // Recent scans (last 7 days)
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     const recentCount = entries.filter(([_, data]) => {
@@ -1085,7 +1278,6 @@ async function renderStats() {
     }).length;
     document.getElementById('recent-scans-stat').textContent = recentCount;
     
-    // Rarity breakdown
     const rarityCounts = {};
     entries.forEach(([_, data]) => {
         rarityCounts[data.rarity] = (rarityCounts[data.rarity] || 0) + 1;
@@ -1107,7 +1299,6 @@ async function renderStats() {
         `;
     });
     
-    // Recent discoveries (last 5)
     const sorted = entries.sort((a, b) => {
         const timeA = a[1].capturedAt?.toMillis?.() || 0;
         const timeB = b[1].capturedAt?.toMillis?.() || 0;
@@ -1133,7 +1324,6 @@ async function renderStats() {
         `;
     });
     
-    // Top stats
     const bodyCounts = {};
     const colorCounts = {};
     let totalEyes = 0;
@@ -1154,10 +1344,6 @@ async function renderStats() {
     document.getElementById('avg-eyes').textContent = (totalEyes / entries.length).toFixed(1);
     document.getElementById('avg-limbs').textContent = (totalLimbs / entries.length).toFixed(1);
 }
-
-// Filters
-document.getElementById('rarity-filter').onchange = renderCollection;
-document.getElementById('sort-filter').onchange = renderCollection;
 
 // Modals
 document.getElementById('close-modal').onclick = () => {

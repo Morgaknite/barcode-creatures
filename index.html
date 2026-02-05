@@ -20,10 +20,33 @@
                 <div id="login-status" class="login-status" style="display: none;"></div>
                 <div id="login-error" class="login-error" style="display: none;"></div>
                 
+                <!-- Google Sign In -->
                 <button class="btn btn-google" id="google-signin">
                     <span class="google-icon">G</span>
                     Sign in with Google
                 </button>
+                
+                <div class="auth-divider">
+                    <span>or continue with email</span>
+                </div>
+                
+                <!-- Email/Password Sign In -->
+                <div class="email-auth-form">
+                    <div class="input-group-auth">
+                        <input type="email" id="email-input" class="auth-input" placeholder="Email address" autocomplete="email">
+                    </div>
+                    <div class="input-group-auth">
+                        <input type="password" id="password-input" class="auth-input" placeholder="Password" autocomplete="current-password">
+                    </div>
+                    <div class="input-group-auth" id="confirm-password-group" style="display: none;">
+                        <input type="password" id="confirm-password-input" class="auth-input" placeholder="Confirm password" autocomplete="new-password">
+                    </div>
+                    <button class="btn btn-email" id="email-submit">Sign In</button>
+                    <div class="auth-links">
+                        <button type="button" class="auth-link" id="forgot-password">Forgot password?</button>
+                        <button type="button" class="auth-link" id="email-toggle-mode">Don't have an account? Sign Up</button>
+                    </div>
+                </div>
                 
                 <div class="login-footer">
                     <p>Your collection will be securely saved and accessible from any device.</p>
