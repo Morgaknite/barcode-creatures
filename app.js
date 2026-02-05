@@ -60,56 +60,29 @@ auth.onAuthStateChanged(async user => {
     }
 });
 
-// Handle redirect result - wait for Firebase to be ready
+// Handle redirect result - DISABLED because signInWithRedirect doesn't work on GitHub Pages
+// Modern browsers (Chrome 115+, Safari 16.1+, Firefox 109+) block third-party storage
+// which breaks the redirect flow for non-Firebase-hosted sites.
+// We now use signInWithPopup exclusively.
+// See: https://firebase.google.com/docs/auth/web/redirect-best-practices
+
+// Legacy redirect handler - kept for any edge cases but unlikely to be triggered
 async function handleRedirectResult() {
     try {
-        debugLog('Checking for redirect result...');
-        showLoginStatus('Checking authentication...');
-        
         const result = await auth.getRedirectResult();
-        
         if (result && result.user) {
-            debugLog('User signed in via redirect:', result.user.email);
-            showLoginStatus('Sign in successful! Loading...');
-            // Auth state change will handle the rest
-        } else {
-            debugLog('No redirect result found (this is normal on first visit)');
+            debugLog('Unexpected redirect result:', result.user.email);
         }
     } catch (error) {
-        debugLog('Redirect result error:', error);
-        
-        let errorMessage = '';
-        
-        switch (error.code) {
-            case 'auth/account-exists-with-different-credential':
-                errorMessage = 'An account already exists with this email using a different sign-in method.';
-                break;
-            case 'auth/network-request-failed':
-                errorMessage = 'Network error. Please check your internet connection and try again.';
-                break;
-            case 'auth/unauthorized-domain':
-                errorMessage = `ERROR: Domain not authorized. Current domain: ${window.location.hostname}. Add it to Firebase Console > Authentication > Settings > Authorized domains.`;
-                break;
-            case 'auth/popup-closed-by-user':
-            case 'auth/cancelled-popup-request':
-                // User closed popup, not an error
-                break;
-            case 'auth/internal-error':
-                errorMessage = 'Authentication error. Please try again. If using an ad blocker, try disabling it.';
-                break;
-            default:
-                if (error.code && error.message) {
-                    errorMessage = `Sign in error (${error.code}): ${error.message}`;
-                }
-        }
-        
-        if (errorMessage) {
-            showLoginStatus(errorMessage, true);
+        // Silently ignore redirect errors since we don't use redirect anymore
+        if (error.code !== 'auth/popup-closed-by-user' && 
+            error.code !== 'auth/cancelled-popup-request') {
+            debugLog('Redirect check error (expected, redirect not used):', error.code);
         }
     }
 }
 
-// Call redirect handler after a short delay to ensure Firebase is fully initialized
+// Check for redirect result on page load (in case someone bookmarked mid-redirect)
 setTimeout(handleRedirectResult, 500);
 
 function showLogin() {
@@ -255,6 +228,11 @@ async function updateLeaderboard() {
 // ==========================================
 // GOOGLE SIGN IN
 // ==========================================
+// IMPORTANT: signInWithRedirect does NOT work on modern browsers (Chrome 115+, Safari 16.1+, Firefox 109+)
+// for sites not hosted on Firebase Hosting, due to third-party storage blocking.
+// We must use signInWithPopup exclusively.
+// See: https://firebase.google.com/docs/auth/web/redirect-best-practices
+
 document.getElementById('google-signin').onclick = async () => {
     const provider = new firebase.auth.GoogleAuthProvider();
     const signInBtn = document.getElementById('google-signin');
@@ -264,43 +242,15 @@ document.getElementById('google-signin').onclick = async () => {
         signInBtn.innerHTML = '<span class="google-icon">G</span> Signing in...';
         showLoginStatus('Opening Google sign-in...');
         
-        debugLog('Starting Google sign-in...');
+        debugLog('Starting Google sign-in with popup...');
         debugLog('Current URL:', window.location.href);
         debugLog('Auth domain:', auth.app.options.authDomain);
         
-        // Detect if we're on mobile
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        debugLog('Is mobile:', isMobile);
-        
-        // On mobile, use redirect (more reliable)
-        // On desktop, try popup first
-        if (isMobile) {
-            debugLog('Using redirect method (mobile)...');
-            showLoginStatus('Redirecting to Google...');
-            await auth.signInWithRedirect(provider);
-            // Page will redirect, no code after this runs
-        } else {
-            // Desktop - try popup first
-            try {
-                debugLog('Trying popup method (desktop)...');
-                const result = await auth.signInWithPopup(provider);
-                debugLog('Popup sign in successful:', result.user.email);
-                // Auth state change will handle the rest
-            } catch (popupError) {
-                debugLog('Popup failed:', popupError.code);
-                
-                // If popup fails, fall back to redirect
-                if (popupError.code === 'auth/popup-blocked' || 
-                    popupError.code === 'auth/popup-closed-by-user' ||
-                    popupError.code === 'auth/cancelled-popup-request') {
-                    debugLog('Falling back to redirect...');
-                    showLoginStatus('Popup blocked, redirecting...');
-                    await auth.signInWithRedirect(provider);
-                } else {
-                    throw popupError;
-                }
-            }
-        }
+        // Use popup only - redirect doesn't work on GitHub Pages due to third-party cookie blocking
+        const result = await auth.signInWithPopup(provider);
+        debugLog('Sign in successful:', result.user.email);
+        showLoginStatus('Sign in successful!');
+        // Auth state change will handle the rest
         
     } catch (error) {
         debugLog('Sign in error:', error);
@@ -311,25 +261,32 @@ document.getElementById('google-signin').onclick = async () => {
         
         switch (error.code) {
             case 'auth/popup-blocked':
-                errorMessage = 'Popup blocked. Please allow popups or try again.';
+                errorMessage = 'Popup was blocked by your browser. Please allow popups for this site and try again. On mobile, you can also use Email/Password sign-in below.';
+                break;
+            case 'auth/popup-closed-by-user':
+            case 'auth/cancelled-popup-request':
+                // User closed popup - not an error, just reset
+                errorMessage = '';
                 break;
             case 'auth/network-request-failed':
-                errorMessage += 'Network error. Please check your internet connection.';
+                errorMessage = 'Network error. Please check your internet connection and try again.';
                 break;
             case 'auth/unauthorized-domain':
-                errorMessage += `Domain not authorized: ${window.location.hostname}`;
+                errorMessage = `This domain (${window.location.hostname}) is not authorized in Firebase. Please contact the app developer.`;
                 break;
             case 'auth/operation-not-allowed':
-                errorMessage += 'Google sign-in is not enabled in Firebase.';
+                errorMessage = 'Google sign-in is not enabled. Please use Email/Password sign-in below.';
                 break;
             case 'auth/internal-error':
-                errorMessage += 'Internal error. Please try again.';
+                errorMessage = 'An error occurred. Please try again. If the problem persists, try Email/Password sign-in below.';
                 break;
             default:
-                errorMessage += error.message || 'Unknown error occurred.';
+                errorMessage += error.message || 'Unknown error occurred. Try Email/Password sign-in below.';
         }
         
-        showLoginStatus(errorMessage, true);
+        if (errorMessage) {
+            showLoginStatus(errorMessage, true);
+        }
     }
 };
 
