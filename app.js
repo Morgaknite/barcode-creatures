@@ -172,12 +172,31 @@ async function updateLeaderboard() {
 // Google Sign In
 document.getElementById('google-signin').onclick = async () => {
     const provider = new firebase.auth.GoogleAuthProvider();
+    const signInBtn = document.getElementById('google-signin');
+    
     try {
+        signInBtn.disabled = true;
+        signInBtn.innerHTML = '<span class="google-icon">G</span> Signing in...';
+        
         // Use redirect instead of popup for better mobile compatibility
         await auth.signInWithRedirect(provider);
     } catch (error) {
         console.error('Sign in error:', error);
-        alert('Sign in failed: ' + error.message);
+        signInBtn.disabled = false;
+        signInBtn.innerHTML = '<span class="google-icon">G</span> Sign in with Google';
+        
+        let errorMessage = 'Sign in failed. ';
+        if (error.code === 'auth/popup-blocked') {
+            errorMessage += 'Please allow popups for this site.';
+        } else if (error.code === 'auth/network-request-failed') {
+            errorMessage += 'Network error. Please check your internet connection.';
+        } else if (error.code === 'auth/unauthorized-domain') {
+            errorMessage += 'This domain is not authorized. Please contact support.';
+        } else {
+            errorMessage += error.message;
+        }
+        
+        alert(errorMessage);
     }
 };
 
@@ -188,8 +207,14 @@ auth.getRedirectResult().then((result) => {
     }
 }).catch((error) => {
     console.error('Redirect result error:', error);
-    if (error.code !== 'auth/popup-closed-by-user') {
-        alert('Sign in error: ' + error.message);
+    
+    // Show user-friendly error messages
+    if (error.code === 'auth/account-exists-with-different-credential') {
+        alert('An account already exists with this email using a different sign-in method.');
+    } else if (error.code === 'auth/network-request-failed') {
+        alert('Network error during sign in. Please check your internet connection and try again.');
+    } else if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
+        alert('Sign in error: ' + error.message + '\n\nPlease try again or contact support if the problem persists.');
     }
 });
 
@@ -198,6 +223,9 @@ document.getElementById('save-username').onclick = async () => {
     const username = document.getElementById('username-input').value.trim();
     const errorEl = document.getElementById('username-error');
     const saveBtn = document.getElementById('save-username');
+    
+    // Clear previous errors
+    errorEl.style.display = 'none';
     
     // Validate
     const validation = await validateUsername(username);
@@ -211,15 +239,20 @@ document.getElementById('save-username').onclick = async () => {
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving...';
     
-    const success = await saveUsername(username);
-    if (success) {
-        document.getElementById('username-modal').classList.remove('active');
-        showApp();
-        updateUserInfo();
-        loadCollection();
-        await updateLeaderboard();
-    } else {
-        errorEl.textContent = 'Failed to save username. Please try again.';
+    try {
+        const success = await saveUsername(username);
+        if (success) {
+            document.getElementById('username-modal').classList.remove('active');
+            showApp();
+            updateUserInfo();
+            await loadCollection();
+            await updateLeaderboard();
+        } else {
+            throw new Error('Failed to save username');
+        }
+    } catch (error) {
+        console.error('Username save error:', error);
+        errorEl.textContent = 'Failed to save username. Please try again or contact support.';
         errorEl.style.display = 'block';
         saveBtn.disabled = false;
         saveBtn.textContent = 'Continue';
@@ -376,41 +409,94 @@ async function processBarcode(barcode) {
     await updateLeaderboard();
 }
 
-// Product Lookup Function
+// Product Lookup Function - tries multiple APIs
 async function lookupProduct(barcode) {
-    try {
-        // Try UPCitemdb first
-        const response = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`);
-        
-        if (!response.ok) {
-            throw new Error('API request failed');
-        }
-        
-        const data = await response.json();
-        
-        if (data.items && data.items.length > 0) {
-            const item = data.items[0];
-            return item.title || item.brand || 'Unknown Product';
-        }
-        
-        return null;
-    } catch (error) {
-        console.error('Product lookup error:', error);
-        
-        // Fallback: Try Open Food Facts for food items
-        try {
-            const offResponse = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
-            const offData = await offResponse.json();
-            
-            if (offData.status === 1 && offData.product) {
-                return offData.product.product_name || null;
+    console.log('Looking up product for barcode:', barcode);
+    
+    // Try multiple APIs in sequence
+    const apis = [
+        // API 1: UPCitemdb (good general coverage)
+        async () => {
+            try {
+                const response = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`);
+                if (!response.ok) throw new Error('UPCitemdb failed');
+                const data = await response.json();
+                if (data.items && data.items.length > 0) {
+                    const item = data.items[0];
+                    return item.title || item.brand || null;
+                }
+                return null;
+            } catch (error) {
+                console.log('UPCitemdb lookup failed:', error);
+                return null;
             }
-        } catch (offError) {
-            console.error('Open Food Facts lookup failed:', offError);
-        }
+        },
         
-        return null;
+        // API 2: Open Food Facts (food/drinks)
+        async () => {
+            try {
+                const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+                if (!response.ok) throw new Error('OpenFoodFacts failed');
+                const data = await response.json();
+                if (data.status === 1 && data.product && data.product.product_name) {
+                    return data.product.product_name;
+                }
+                return null;
+            } catch (error) {
+                console.log('OpenFoodFacts lookup failed:', error);
+                return null;
+            }
+        },
+        
+        // API 3: UPCDatabase.org (another good option)
+        async () => {
+            try {
+                const response = await fetch(`https://api.upcdatabase.org/product/${barcode}`);
+                if (!response.ok) throw new Error('UPCDatabase failed');
+                const data = await response.json();
+                if (data.success && data.title) {
+                    return data.title;
+                }
+                return null;
+            } catch (error) {
+                console.log('UPCDatabase lookup failed:', error);
+                return null;
+            }
+        },
+        
+        // API 4: Barcodelookup.com
+        async () => {
+            try {
+                const response = await fetch(`https://api.barcodelookup.com/v3/products?barcode=${barcode}&formatted=y&key=trial`);
+                if (!response.ok) throw new Error('Barcodelookup failed');
+                const data = await response.json();
+                if (data.products && data.products.length > 0) {
+                    return data.products[0].title || data.products[0].product_name;
+                }
+                return null;
+            } catch (error) {
+                console.log('Barcodelookup lookup failed:', error);
+                return null;
+            }
+        }
+    ];
+    
+    // Try each API until one succeeds
+    for (const apiFunc of apis) {
+        try {
+            const result = await apiFunc();
+            if (result) {
+                console.log('Product found:', result);
+                return result;
+            }
+        } catch (error) {
+            // Continue to next API
+            continue;
+        }
     }
+    
+    console.log('No product info found from any API');
+    return null;
 }
 
 function showDiscovery(barcode, data, productName = '') {
