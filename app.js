@@ -8,6 +8,8 @@ let scanning = false;
 
 // Authentication State
 auth.onAuthStateChanged(async user => {
+    console.log('Auth state changed:', user ? user.email : 'no user');
+    
     if (user) {
         currentUser = user;
         
@@ -26,6 +28,32 @@ auth.onAuthStateChanged(async user => {
         showLogin();
     }
 });
+
+// Handle redirect result IMMEDIATELY on page load (before auth state change)
+(async function() {
+    try {
+        console.log('Checking for redirect result...');
+        const result = await auth.getRedirectResult();
+        
+        if (result.user) {
+            console.log('User signed in via redirect:', result.user.email);
+            // Auth state change will handle the rest
+        } else {
+            console.log('No redirect result found');
+        }
+    } catch (error) {
+        console.error('Redirect result error:', error);
+        
+        // Show user-friendly error messages
+        if (error.code === 'auth/account-exists-with-different-credential') {
+            alert('An account already exists with this email using a different sign-in method. Try signing in with a different method.');
+        } else if (error.code === 'auth/network-request-failed') {
+            alert('Network error during sign in. Please check your internet connection and try again.');
+        } else if (error.code && error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
+            alert('Sign in error: ' + error.message + '\n\nPlease try again or contact support.');
+        }
+    }
+})();
 
 function showLogin() {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -178,6 +206,7 @@ document.getElementById('google-signin').onclick = async () => {
         signInBtn.disabled = true;
         signInBtn.innerHTML = '<span class="google-icon">G</span> Signing in...';
         
+        console.log('Starting sign in redirect...');
         // Use redirect instead of popup for better mobile compatibility
         await auth.signInWithRedirect(provider);
     } catch (error) {
@@ -200,23 +229,25 @@ document.getElementById('google-signin').onclick = async () => {
     }
 };
 
-// Handle redirect result on page load
-auth.getRedirectResult().then((result) => {
-    if (result.user) {
-        console.log('Successfully signed in via redirect');
-    }
-}).catch((error) => {
-    console.error('Redirect result error:', error);
+// Anonymous Sign In
+document.getElementById('anonymous-signin').onclick = async () => {
+    const signInBtn = document.getElementById('anonymous-signin');
     
-    // Show user-friendly error messages
-    if (error.code === 'auth/account-exists-with-different-credential') {
-        alert('An account already exists with this email using a different sign-in method.');
-    } else if (error.code === 'auth/network-request-failed') {
-        alert('Network error during sign in. Please check your internet connection and try again.');
-    } else if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
-        alert('Sign in error: ' + error.message + '\n\nPlease try again or contact support if the problem persists.');
+    try {
+        signInBtn.disabled = true;
+        signInBtn.textContent = 'Starting...';
+        
+        console.log('Starting anonymous sign in...');
+        await auth.signInAnonymously();
+        // Auth state change will handle the rest
+    } catch (error) {
+        console.error('Anonymous sign in error:', error);
+        signInBtn.disabled = false;
+        signInBtn.innerHTML = '🎭 Try Without Account';
+        
+        alert('Anonymous sign in failed: ' + error.message);
     }
-});
+};
 
 // Username Modal
 document.getElementById('save-username').onclick = async () => {
